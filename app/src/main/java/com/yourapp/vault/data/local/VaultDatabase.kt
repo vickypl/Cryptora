@@ -18,7 +18,7 @@ abstract class VaultDatabase : RoomDatabase() {
                 "vault_encrypted.db"
             )
                 .openHelperFactory(SupportFactory(passphrase))
-                .fallbackToDestructiveMigration(false)
+                .fallbackToDestructiveMigration()
                 .build()
         }
     }

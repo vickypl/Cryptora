@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     var vaultViewModel by remember { mutableStateOf<VaultViewModel?>(null) }
+                    var setupDone by remember { mutableStateOf(appContainer.isSetupDone()) }
                     val unlocked by sessionVm.isUnlocked.collectAsState()
 
                     LaunchedEffect(unlocked) {
@@ -47,14 +48,17 @@ class MainActivity : ComponentActivity() {
                     }
 
                     VaultApp(
-                        setupDone = appContainer.isSetupDone(),
+                        setupDone = setupDone,
                         rooted = RootDetection.isRooted(),
                         unlocked = unlocked,
                         biometricEnabled = appContainer.biometricEnabled(),
                         onSetup = { master, pin ->
-                            val dbKey = appContainer.authManager.createVault(master.toCharArray(), pin?.toCharArray())
-                            vaultViewModel = VaultViewModel(appContainer.createRepository(dbKey))
-                            sessionVm.unlock()
+                            runCatching {
+                                val dbKey = appContainer.authManager.createVault(master.toCharArray(), pin?.toCharArray())
+                                vaultViewModel = VaultViewModel(appContainer.createRepository(dbKey))
+                                setupDone = true
+                                sessionVm.unlock()
+                            }
                         },
                         onUnlock = { password, pin ->
                             val success = when {

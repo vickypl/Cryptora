@@ -1,20 +1,37 @@
 package com.yourapp.vault.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -28,9 +45,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.yourapp.vault.domain.model.Credential
 import com.yourapp.vault.security.PasswordGenerator
@@ -44,31 +65,150 @@ fun VaultApp(
     rooted: Boolean,
     unlocked: Boolean,
     biometricEnabled: Boolean,
-    onSetup: (master: String, pin: String?) -> Unit,
+    onSetup: (master: String, pin: String?) -> Result<Unit>,
     onUnlock: (password: String?, pin: String?) -> Boolean,
     onBiometricToggle: (Boolean) -> Unit,
     onRequireLock: () -> Unit,
     lockoutMs: Long,
     vaultViewModel: VaultViewModel?
 ) {
-    when {
-        !setupDone -> SetupScreen(onSetup)
-        !unlocked -> UnlockScreen(onUnlock = onUnlock, lockoutMs = lockoutMs)
-        else -> VaultHome(rooted, biometricEnabled, onBiometricToggle, onRequireLock, vaultViewModel)
+    AnimatedContent(
+        targetState = Triple(setupDone, unlocked, vaultViewModel),
+        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        label = "vault-navigation"
+    ) { (isSetupDone, isUnlocked, vm) ->
+        when {
+            !isSetupDone -> SetupScreen(onSetup)
+            !isUnlocked -> UnlockScreen(onUnlock = onUnlock, lockoutMs = lockoutMs)
+            else -> VaultHome(rooted, biometricEnabled, onBiometricToggle, onRequireLock, vm)
+        }
     }
 }
 
 @Composable
-private fun SetupScreen(onSetup: (String, String?) -> Unit) {
+private fun SetupScreen(onSetup: (String, String?) -> Result<Unit>) {
     var master by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var creatingVault by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Initial Setup")
-        OutlinedTextField(value = master, onValueChange = { master = it }, label = { Text("Master Password") })
-        OutlinedTextField(value = pin, onValueChange = { pin = it }, label = { Text("Optional PIN") })
-        Button(onClick = { if (master.length >= 8) onSetup(master, pin.ifBlank { null }) }) { Text("Create Vault") }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+            .imePadding()
+            .padding(horizontal = 24.dp)
+    ) {
+        ElevatedCard(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth()
+                .widthIn(max = 460.dp),
+            shape = RoundedCornerShape(28.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Create Your Vault",
+                    style = MaterialTheme.typography.headlineSmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = "Use a strong master password to protect your offline vault.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = master,
+                    onValueChange = {
+                        master = it
+                        if (error != null) error = null
+                    },
+                    label = { Text("Master Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !creatingVault
+                )
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = {
+                        pin = it.filter(Char::isDigit)
+                        if (error != null) error = null
+                    },
+                    label = { Text("Optional PIN") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !creatingVault
+                )
+
+                AnimatedVisibility(visible = error != null) {
+                    Text(
+                        text = error.orEmpty(),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        val validationError = validateSetupInput(master, pin)
+                        if (validationError != null) {
+                            error = validationError
+                            return@Button
+                        }
+
+                        creatingVault = true
+                        val result = onSetup(master, pin.ifBlank { null })
+                        creatingVault = false
+                        if (result.isFailure) {
+                            error = result.exceptionOrNull()?.message ?: "Unable to create vault. Please try again."
+                        }
+                    },
+                    enabled = !creatingVault,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    if (creatingVault) {
+                        CircularProgressIndicator(
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.padding(vertical = 4.dp).size(20.dp)
+                        )
+                    } else {
+                        Text("Create Vault", modifier = Modifier.padding(vertical = 4.dp))
+                    }
+                }
+            }
+        }
     }
+}
+
+private fun validateSetupInput(master: String, pin: String): String? {
+    if (master.length < 12) {
+        return "Master password must be at least 12 characters."
+    }
+    if (master.none(Char::isUpperCase) || master.none(Char::isLowerCase) || master.none(Char::isDigit) || !master.any { !it.isLetterOrDigit() }) {
+        return "Use uppercase, lowercase, number, and symbol in master password."
+    }
+    if (pin.isNotBlank()) {
+        if (pin.length !in 4..8) {
+            return "PIN must be 4 to 8 digits."
+        }
+        if (pin.any { !it.isDigit() }) {
+            return "PIN can only contain digits."
+        }
+    }
+    return null
 }
 
 @Composable

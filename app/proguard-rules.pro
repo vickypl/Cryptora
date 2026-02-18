@@ -1,0 +1,2 @@
+-dontwarn net.sqlcipher.**
+-keep class androidx.biometric.** { *; }

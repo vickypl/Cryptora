@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -48,8 +47,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -65,8 +62,9 @@ fun VaultApp(
     rooted: Boolean,
     unlocked: Boolean,
     biometricEnabled: Boolean,
-    onSetup: (master: String, pin: String?) -> Result<Unit>,
-    onUnlock: (password: String?, pin: String?) -> String?,
+    onSetup: (master: String) -> Result<Unit>,
+    onUnlock: (password: String?) -> String?,
+    onBiometricUnlock: (onResult: (String?) -> Unit) -> Unit,
     onBiometricToggle: (Boolean) -> Unit,
     onRequireLock: () -> Unit,
     onUserActivity: () -> Unit,
@@ -80,16 +78,21 @@ fun VaultApp(
     ) { (isSetupDone, isUnlocked, vm) ->
         when {
             !isSetupDone -> SetupScreen(onSetup, onUserActivity)
-            !isUnlocked -> UnlockScreen(onUnlock = onUnlock, lockoutMs = lockoutMs, onUserActivity = onUserActivity)
+            !isUnlocked -> UnlockScreen(
+                onUnlock = onUnlock,
+                onBiometricUnlock = onBiometricUnlock,
+                lockoutMs = lockoutMs,
+                onUserActivity = onUserActivity,
+                biometricEnabled = biometricEnabled
+            )
             else -> VaultHome(rooted, biometricEnabled, onBiometricToggle, onRequireLock, onUserActivity, vm)
         }
     }
 }
 
 @Composable
-private fun SetupScreen(onSetup: (String, String?) -> Result<Unit>, onUserActivity: () -> Unit) {
+private fun SetupScreen(onSetup: (String) -> Result<Unit>, onUserActivity: () -> Unit) {
     var master by remember { mutableStateOf("") }
-    var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var creatingVault by remember { mutableStateOf(false) }
 
@@ -140,20 +143,6 @@ private fun SetupScreen(onSetup: (String, String?) -> Result<Unit>, onUserActivi
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !creatingVault
                 )
-                OutlinedTextField(
-                    value = pin,
-                    onValueChange = {
-                        onUserActivity()
-                        pin = it.filter(Char::isDigit)
-                        if (error != null) error = null
-                    },
-                    label = { Text("Optional PIN") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !creatingVault
-                )
 
                 AnimatedVisibility(visible = error != null) {
                     Text(
@@ -166,14 +155,14 @@ private fun SetupScreen(onSetup: (String, String?) -> Result<Unit>, onUserActivi
                 Button(
                     onClick = {
                         onUserActivity()
-                        val validationError = validateSetupInput(master, pin)
+                        val validationError = validateSetupInput(master)
                         if (validationError != null) {
                             error = validationError
                             return@Button
                         }
 
                         creatingVault = true
-                        val result = onSetup(master, pin.ifBlank { null })
+                        val result = onSetup(master)
                         creatingVault = false
                         if (result.isFailure) {
                             error = result.exceptionOrNull()?.message ?: "Unable to create vault. Please try again."
@@ -197,28 +186,25 @@ private fun SetupScreen(onSetup: (String, String?) -> Result<Unit>, onUserActivi
     }
 }
 
-private fun validateSetupInput(master: String, pin: String): String? {
+private fun validateSetupInput(master: String): String? {
     if (master.length < 12) {
         return "Master password must be at least 12 characters."
     }
     if (master.none(Char::isUpperCase) || master.none(Char::isLowerCase) || master.none(Char::isDigit) || !master.any { !it.isLetterOrDigit() }) {
         return "Use uppercase, lowercase, number, and symbol in master password."
     }
-    if (pin.isNotBlank()) {
-        if (pin.length !in 4..8) {
-            return "PIN must be 4 to 8 digits."
-        }
-        if (pin.any { !it.isDigit() }) {
-            return "PIN can only contain digits."
-        }
-    }
     return null
 }
 
 @Composable
-private fun UnlockScreen(onUnlock: (String?, String?) -> String?, lockoutMs: Long, onUserActivity: () -> Unit) {
+private fun UnlockScreen(
+    onUnlock: (String?) -> String?,
+    onBiometricUnlock: (onResult: (String?) -> Unit) -> Unit,
+    lockoutMs: Long,
+    onUserActivity: () -> Unit,
+    biometricEnabled: Boolean
+) {
     var password by remember { mutableStateOf("") }
-    var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -226,15 +212,33 @@ private fun UnlockScreen(onUnlock: (String?, String?) -> String?, lockoutMs: Lon
         if (lockoutMs > 0) {
             Text("Too many failed attempts. Retry in ${lockoutMs / 1000}s")
         }
-        OutlinedTextField(value = password, onValueChange = { onUserActivity(); password = it }, label = { Text("Master Password") })
-        OutlinedTextField(value = pin, onValueChange = { onUserActivity(); pin = it }, label = { Text("PIN") })
+        OutlinedTextField(
+            value = password,
+            onValueChange = { onUserActivity(); password = it },
+            label = { Text("Master Password") },
+            visualTransformation = PasswordVisualTransformation(),
+            singleLine = true
+        )
         Button(
             enabled = lockoutMs == 0L,
             onClick = {
                 onUserActivity()
-                error = onUnlock(password.ifBlank { null }, pin.ifBlank { null })
+                error = onUnlock(password.ifBlank { null })
             }
-        ) { Text("Unlock") }
+        ) { Text("Unlock with Master Password") }
+
+        if (biometricEnabled) {
+            Button(
+                enabled = lockoutMs == 0L,
+                onClick = {
+                    onUserActivity()
+                    onBiometricUnlock { unlockError ->
+                        error = unlockError
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Unlock with Biometrics") }
+        }
         error?.let { Text(it) }
     }
 }

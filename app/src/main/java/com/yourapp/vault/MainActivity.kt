@@ -5,6 +5,9 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -51,21 +54,18 @@ class MainActivity : ComponentActivity() {
                         rooted = RootDetection.isRooted(),
                         unlocked = unlocked,
                         biometricEnabled = appContainer.biometricEnabled(),
-                        onSetup = { master, pin ->
+                        onSetup = { master ->
                             runCatching {
-                                val dbKey = appContainer.authManager.createVault(master.toCharArray(), pin?.toCharArray())
+                                val dbKey = appContainer.authManager.createVault(master.toCharArray(), null)
                                 vaultViewModel = VaultViewModel(appContainer.createRepository(dbKey))
                                 setupDone = true
                                 sessionVm.unlock()
                             }
                         },
-                        onUnlock = { password, pin ->
+                        onUnlock = { password ->
                             runCatching {
-                                val success = when {
-                                    !password.isNullOrBlank() -> appContainer.authManager.verifyMasterPassword(password.toCharArray())
-                                    !pin.isNullOrBlank() -> appContainer.authManager.verifyPin(pin.toCharArray())
-                                    else -> false
-                                }
+                                val success = !password.isNullOrBlank() &&
+                                    appContainer.authManager.verifyMasterPassword(password.toCharArray())
                                 if (!success) {
                                     return@runCatching "Authentication failed"
                                 }
@@ -77,6 +77,52 @@ class MainActivity : ComponentActivity() {
                                 null
                             }.getOrElse {
                                 "Unable to unlock vault. Please try again."
+                            }
+                        },
+                        onBiometricUnlock = { onResult ->
+                            val biometricManager = BiometricManager.from(this)
+                            val allowedAuthenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                                BiometricManager.Authenticators.BIOMETRIC_WEAK
+                            if (biometricManager.canAuthenticate(allowedAuthenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
+                                onResult("Biometric authentication is not available")
+                            } else {
+                                val executor = ContextCompat.getMainExecutor(this)
+                                val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                                    .setTitle("Unlock Cryptora")
+                                    .setSubtitle("Authenticate to access your vault")
+                                    .setNegativeButtonText("Cancel")
+                                    .build()
+
+                                val biometricPrompt = BiometricPrompt(
+                                    this,
+                                    executor,
+                                    object : BiometricPrompt.AuthenticationCallback() {
+                                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                            val dbKey = appContainer.authManager.openDbKey()
+                                            if (dbKey == null) {
+                                                onResult("Unable to access vault key")
+                                                return
+                                            }
+                                            runCatching {
+                                                vaultViewModel = VaultViewModel(appContainer.createRepository(dbKey))
+                                                sessionVm.unlock()
+                                                onResult(null)
+                                            }.getOrElse {
+                                                onResult("Unable to unlock vault. Please try again.")
+                                            }
+                                        }
+
+                                        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                                            onResult(errString.toString())
+                                        }
+
+                                        override fun onAuthenticationFailed() {
+                                            onResult("Authentication failed")
+                                        }
+                                    }
+                                )
+
+                                biometricPrompt.authenticate(promptInfo)
                             }
                         },
                         onBiometricToggle = appContainer::setBiometricEnabled,

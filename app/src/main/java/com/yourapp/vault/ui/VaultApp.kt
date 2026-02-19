@@ -313,6 +313,11 @@ private fun VaultHome(
                 onUserActivity()
                 secureClipboard.copyPassword(item.password)
                 scope.launch { snackbar.showSnackbar("Password copied and will clear in 15s") }
+            },
+            onCopyUsername = {
+                onUserActivity()
+                secureClipboard.copyUsernameOrEmail(item.username)
+                scope.launch { snackbar.showSnackbar("Username/email copied and will clear in 15s") }
             }
         )
     }
@@ -365,13 +370,15 @@ private fun CredentialDetailDialog(
     credential: Credential,
     onDismiss: () -> Unit,
     onDelete: () -> Unit,
-    onCopyPassword: () -> Unit
+    onCopyPassword: () -> Unit,
+    onCopyUsername: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { Button(onClick = onCopyPassword) { Text("Copy Password") } },
         dismissButton = {
             Row {
+                TextButton(onClick = onCopyUsername) { Text("Copy Username/Email") }
                 TextButton(onClick = onDelete) { Text("Delete") }
                 TextButton(onClick = onDismiss) { Text("Close") }
             }

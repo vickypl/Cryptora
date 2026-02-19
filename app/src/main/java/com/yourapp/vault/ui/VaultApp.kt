@@ -433,6 +433,27 @@ private fun VaultHome(
         )
     }
 
+    if (settingsOpen) {
+        SettingsDialog(
+            biometricEnabled = biometricEnabled,
+            selectedTheme = selectedTheme,
+            onBiometricToggle = {
+                onUserActivity()
+                onBiometricToggle(it)
+            },
+            onThemeSelected = {
+                onUserActivity()
+                onThemeChange(it)
+            },
+            onChangeMasterPassword = { current, next ->
+                onUserActivity()
+                onChangeMasterPassword(current, next)
+            },
+            onDismiss = { settingsOpen = false }
+        )
+    }
+
+
     selected?.let { item ->
         CredentialDetailDialog(
             credential = item,
@@ -455,26 +476,6 @@ private fun VaultHome(
         )
     }
 }
-
-    if (settingsOpen) {
-        SettingsDialog(
-            biometricEnabled = biometricEnabled,
-            selectedTheme = selectedTheme,
-            onBiometricToggle = {
-                onUserActivity()
-                onBiometricToggle(it)
-            },
-            onThemeSelected = {
-                onUserActivity()
-                onThemeChange(it)
-            },
-            onChangeMasterPassword = { current, next ->
-                onUserActivity()
-                onChangeMasterPassword(current, next)
-            },
-            onDismiss = { settingsOpen = false }
-        )
-    }
 
 @Composable
 private fun AddCredentialDialog(

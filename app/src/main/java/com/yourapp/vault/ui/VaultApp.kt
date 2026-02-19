@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -47,11 +48,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.yourapp.vault.R
 import com.yourapp.vault.domain.model.Credential
 import com.yourapp.vault.security.PasswordGenerator
 import com.yourapp.vault.util.SecureClipboard
@@ -220,39 +224,101 @@ private fun UnlockScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Unlock Vault")
-        if (lockoutMs > 0) {
-            Text("Too many failed attempts. Retry in ${lockoutMs / 1000}s")
-        }
-        OutlinedTextField(
-            value = password,
-            onValueChange = { onUserActivity(); password = it },
-            label = { Text("Master Password") },
-            visualTransformation = PasswordVisualTransformation(),
-            singleLine = true
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+            .imePadding()
+            .padding(horizontal = 24.dp)
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.ic_launcher_foreground),
+            contentDescription = null,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(280.dp)
+                .alpha(0.08f)
         )
-        Button(
-            enabled = lockoutMs == 0L,
-            onClick = {
-                onUserActivity()
-                error = onUnlock(password.ifBlank { null })
-            }
-        ) { Text("Unlock with Master Password") }
 
-        if (biometricEnabled) {
-            Button(
-                enabled = lockoutMs == 0L,
-                onClick = {
-                    onUserActivity()
-                    onBiometricUnlock { unlockError ->
-                        error = unlockError
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Try Biometrics Again") }
+        ElevatedCard(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth()
+                .widthIn(max = 460.dp),
+            shape = RoundedCornerShape(28.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Secure Vault Login",
+                    style = MaterialTheme.typography.headlineSmall,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "Authenticate to access your encrypted credentials.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                if (lockoutMs > 0) {
+                    Text(
+                        text = "Too many failed attempts. Retry in ${lockoutMs / 1000}s",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { onUserActivity(); password = it },
+                    label = { Text("Master Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    enabled = lockoutMs == 0L,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                )
+
+                if (biometricEnabled) {
+                    FilledTonalButton(
+                        enabled = lockoutMs == 0L,
+                        onClick = {
+                            onUserActivity()
+                            onBiometricUnlock { unlockError ->
+                                error = unlockError
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
+                    ) { Text("Unlock with Biometrics") }
+                }
+
+                Button(
+                    enabled = lockoutMs == 0L,
+                    onClick = {
+                        onUserActivity()
+                        error = onUnlock(password.ifBlank { null })
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                ) { Text("Unlock") }
+
+                error?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
         }
-        error?.let { Text(it) }
     }
 }
 

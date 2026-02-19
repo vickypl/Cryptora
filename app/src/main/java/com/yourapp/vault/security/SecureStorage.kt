@@ -29,11 +29,15 @@ class SecureStorage(context: Context) {
 
     fun getSalt(): ByteArray? = prefs.getString("salt", null)?.fromB64()
     fun getMasterHash(): ByteArray? = prefs.getString("master_hash", null)?.fromB64()
+    fun setMasterHash(masterHash: ByteArray) = prefs.edit { putString("master_hash", masterHash.toB64()) }
     fun getWrappedDbKey(): ByteArray? = prefs.getString("wrapped_db_key", null)?.fromB64()
     fun getWrappedDbIv(): ByteArray? = prefs.getString("wrapped_db_key_iv", null)?.fromB64()
 
     fun setBiometricEnabled(enabled: Boolean) = prefs.edit { putBoolean("biometric_enabled", enabled) }
     fun biometricEnabled(): Boolean = prefs.getBoolean("biometric_enabled", true)
+
+    fun setTheme(theme: String) = prefs.edit { putString("app_theme", theme) }
+    fun getTheme(): String = prefs.getString("app_theme", "MIDNIGHT") ?: "MIDNIGHT"
 
     fun setPinHash(pinHash: ByteArray?) = prefs.edit {
         if (pinHash == null) remove("pin_hash") else putString("pin_hash", pinHash.toB64())

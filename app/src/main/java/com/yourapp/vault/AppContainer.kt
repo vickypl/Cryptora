@@ -15,6 +15,12 @@ class AppContainer(private val context: Context) {
     fun isSetupDone(): Boolean = storage.isSetupDone()
     fun biometricEnabled(): Boolean = storage.biometricEnabled()
     fun setBiometricEnabled(enabled: Boolean) = storage.setBiometricEnabled(enabled)
+    fun selectedTheme(): String = storage.getTheme()
+    fun setSelectedTheme(theme: String) = storage.setTheme(theme)
+
+    fun changeMasterPassword(currentPassword: String, newPassword: String): String? {
+        return authManager.changeMasterPassword(currentPassword.toCharArray(), newPassword.toCharArray())
+    }
 
     fun createRepository(dbKey: ByteArray): VaultRepository {
         val db = VaultDatabase.build(context, dbKey)

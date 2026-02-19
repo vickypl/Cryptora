@@ -32,6 +32,9 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -73,6 +76,9 @@ fun VaultApp(
     onUnlock: (password: String?) -> String?,
     onBiometricUnlock: (onResult: (String?) -> Unit) -> Unit,
     onBiometricToggle: (Boolean) -> Unit,
+    selectedTheme: String,
+    onThemeChange: (String) -> Unit,
+    onChangeMasterPassword: (current: String, next: String) -> String?,
     onRequireLock: () -> Unit,
     onUserActivity: () -> Unit,
     lockoutMs: Long,
@@ -92,7 +98,17 @@ fun VaultApp(
                 onUserActivity = onUserActivity,
                 biometricEnabled = biometricEnabled
             )
-            else -> VaultHome(rooted, biometricEnabled, onBiometricToggle, onRequireLock, onUserActivity, vm)
+            else -> VaultHome(
+                rooted = rooted,
+                biometricEnabled = biometricEnabled,
+                selectedTheme = selectedTheme,
+                onThemeChange = onThemeChange,
+                onChangeMasterPassword = onChangeMasterPassword,
+                onBiometricToggle = onBiometricToggle,
+                onRequireLock = onRequireLock,
+                onUserActivity = onUserActivity,
+                viewModel = vm
+            )
         }
     }
 }
@@ -328,6 +344,9 @@ private fun VaultHome(
     rooted: Boolean,
     biometricEnabled: Boolean,
     onBiometricToggle: (Boolean) -> Unit,
+    selectedTheme: String,
+    onThemeChange: (String) -> Unit,
+    onChangeMasterPassword: (current: String, next: String) -> String?,
     onRequireLock: () -> Unit,
     onUserActivity: () -> Unit,
     viewModel: VaultViewModel?
@@ -342,6 +361,7 @@ private fun VaultHome(
     var adding by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<Credential?>(null) }
     var editing by remember { mutableStateOf<Credential?>(null) }
+    var settingsOpen by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -352,11 +372,21 @@ private fun VaultHome(
         floatingActionButton = { FloatingActionButton(onClick = { onUserActivity(); adding = true }) { Text("+") } }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (rooted) Text("Warning: rooted device detected")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Biometric")
-                Switch(checked = biometricEnabled, onCheckedChange = { onUserActivity(); onBiometricToggle(it) })
-                TextButton(onClick = { onUserActivity(); onRequireLock() }) { Text("Lock") }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text("Vault", style = MaterialTheme.typography.titleLarge)
+                    if (rooted) {
+                        Text("Warning: rooted device detected", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { onUserActivity(); onRequireLock() }) { Text("Lock") }
+                    IconButton(onClick = { onUserActivity(); settingsOpen = true }) { Text("⚙") }
+                }
             }
             OutlinedTextField(
                 value = query,
@@ -425,6 +455,26 @@ private fun VaultHome(
         )
     }
 }
+
+    if (settingsOpen) {
+        SettingsDialog(
+            biometricEnabled = biometricEnabled,
+            selectedTheme = selectedTheme,
+            onBiometricToggle = {
+                onUserActivity()
+                onBiometricToggle(it)
+            },
+            onThemeSelected = {
+                onUserActivity()
+                onThemeChange(it)
+            },
+            onChangeMasterPassword = { current, next ->
+                onUserActivity()
+                onChangeMasterPassword(current, next)
+            },
+            onDismiss = { settingsOpen = false }
+        )
+    }
 
 @Composable
 private fun AddCredentialDialog(
@@ -591,6 +641,119 @@ private fun CredentialDetailDialog(
         }
     )
 }
+
+@Composable
+private fun SettingsDialog(
+    biometricEnabled: Boolean,
+    selectedTheme: String,
+    onBiometricToggle: (Boolean) -> Unit,
+    onThemeSelected: (String) -> Unit,
+    onChangeMasterPassword: (current: String, next: String) -> String?,
+    onDismiss: () -> Unit
+) {
+    var currentPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Settings", style = MaterialTheme.typography.headlineSmall) },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("Security", style = MaterialTheme.typography.titleMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Biometric Authentication")
+                    Switch(checked = biometricEnabled, onCheckedChange = onBiometricToggle)
+                }
+
+                HorizontalDivider()
+
+                Text("Theme", style = MaterialTheme.typography.titleMedium)
+                appThemeOptions.forEach { option ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clickable { onThemeSelected(option.key) },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = selectedTheme == option.key, onClick = { onThemeSelected(option.key) })
+                        Text(option.label)
+                    }
+                }
+
+                HorizontalDivider()
+
+                Text("Change Master Password", style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = currentPassword,
+                    onValueChange = { currentPassword = it; passwordError = null },
+                    label = { Text("Current Master Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                OutlinedTextField(
+                    value = newPassword,
+                    onValueChange = { newPassword = it; passwordError = null },
+                    label = { Text("New Master Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = { confirmPassword = it; passwordError = null },
+                    label = { Text("Confirm New Master Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                Button(
+                    onClick = {
+                        passwordError = when {
+                            newPassword != confirmPassword -> "New password and confirm password do not match"
+                            else -> onChangeMasterPassword(currentPassword, newPassword)
+                        }
+                        if (passwordError == null) {
+                            currentPassword = ""
+                            newPassword = ""
+                            confirmPassword = ""
+                            passwordError = "Master password updated successfully"
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("Update Master Password") }
+
+                passwordError?.let {
+                    Text(
+                        text = it,
+                        color = if (it.contains("success", ignoreCase = true)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+    )
+}
+
+private data class ThemeOption(val key: String, val label: String)
+
+private val appThemeOptions = listOf(
+    ThemeOption("MIDNIGHT", "Midnight Blue"),
+    ThemeOption("SLATE", "Slate Gray"),
+    ThemeOption("GRAPHITE", "Graphite"),
+    ThemeOption("FOREST", "Forest Night"),
+    ThemeOption("INDIGO", "Indigo")
+)
+
 
 @Composable
 private fun DetailLineWithCopy(label: String, value: String, onCopy: () -> Unit) {

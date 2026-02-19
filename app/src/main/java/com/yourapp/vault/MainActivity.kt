@@ -11,6 +11,8 @@ import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -37,7 +39,9 @@ class MainActivity : FragmentActivity() {
         val sessionVm = ViewModelProvider(this)[SessionViewModel::class.java]
 
         setContent {
-            MaterialTheme {
+            var selectedTheme by remember { mutableStateOf(appContainer.selectedTheme()) }
+
+            MaterialTheme(colorScheme = colorSchemeFor(selectedTheme)) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     var vaultViewModel by remember { mutableStateOf<VaultViewModel?>(null) }
                     var setupDone by remember { mutableStateOf(appContainer.isSetupDone()) }
@@ -137,6 +141,12 @@ class MainActivity : FragmentActivity() {
                             }
                         },
                         onBiometricToggle = appContainer::setBiometricEnabled,
+                        selectedTheme = selectedTheme,
+                        onThemeChange = { theme ->
+                            selectedTheme = theme
+                            appContainer.setSelectedTheme(theme)
+                        },
+                        onChangeMasterPassword = appContainer::changeMasterPassword,
                         onRequireLock = { sessionVm.lock() },
                         onUserActivity = { sessionVm.markActive() },
                         lockoutMs = appContainer.authManager.lockoutRemainingMs(),
@@ -154,4 +164,48 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+}
+
+private fun colorSchemeFor(theme: String) = when (theme) {
+    "MIDNIGHT" -> darkColorScheme(
+        primary = Color(0xFF8FA8FF),
+        secondary = Color(0xFF9DB5C9),
+        tertiary = Color(0xFFA9C4A0),
+        surface = Color(0xFF10131A),
+        background = Color(0xFF0C0F15)
+    )
+
+    "SLATE" -> darkColorScheme(
+        primary = Color(0xFF8BA1B8),
+        secondary = Color(0xFF9AA8B8),
+        tertiary = Color(0xFF8EB0A0),
+        surface = Color(0xFF14171C),
+        background = Color(0xFF101317)
+    )
+
+    "GRAPHITE" -> darkColorScheme(
+        primary = Color(0xFFA7AFC0),
+        secondary = Color(0xFFB0B6C2),
+        tertiary = Color(0xFF95A79E),
+        surface = Color(0xFF151515),
+        background = Color(0xFF0F0F10)
+    )
+
+    "FOREST" -> darkColorScheme(
+        primary = Color(0xFF8FB2A0),
+        secondary = Color(0xFF97AA9D),
+        tertiary = Color(0xFFB2C19A),
+        surface = Color(0xFF111814),
+        background = Color(0xFF0D120F)
+    )
+
+    "INDIGO" -> darkColorScheme(
+        primary = Color(0xFF9E9DDA),
+        secondary = Color(0xFF9FA8DA),
+        tertiary = Color(0xFF90A4AE),
+        surface = Color(0xFF14142A),
+        background = Color(0xFF0E0E1C)
+    )
+
+    else -> darkColorScheme()
 }

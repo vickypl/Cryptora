@@ -80,13 +80,13 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         onBiometricUnlock = { onResult ->
-                            val biometricManager = BiometricManager.from(this)
+                            val biometricManager = BiometricManager.from(this@MainActivity)
                             val allowedAuthenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
                                 BiometricManager.Authenticators.BIOMETRIC_WEAK
                             if (biometricManager.canAuthenticate(allowedAuthenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
                                 onResult("Biometric authentication is not available")
                             } else {
-                                val executor = ContextCompat.getMainExecutor(this)
+                                val executor = ContextCompat.getMainExecutor(this@MainActivity)
                                 val promptInfo = BiometricPrompt.PromptInfo.Builder()
                                     .setTitle("Unlock Cryptora")
                                     .setSubtitle("Authenticate to access your vault")
@@ -94,7 +94,7 @@ class MainActivity : ComponentActivity() {
                                     .build()
 
                                 val biometricPrompt = BiometricPrompt(
-                                    this,
+                                    this@MainActivity,
                                     executor,
                                     object : BiometricPrompt.AuthenticationCallback() {
                                         override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {

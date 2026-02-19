@@ -29,6 +29,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -278,7 +279,14 @@ private fun VaultHome(
                 Switch(checked = biometricEnabled, onCheckedChange = { onUserActivity(); onBiometricToggle(it) })
                 TextButton(onClick = { onUserActivity(); onRequireLock() }) { Text("Lock") }
             }
-            OutlinedTextField(value = query, onValueChange = { onUserActivity(); viewModel.setQuery(it) }, label = { Text("Search") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                value = query,
+                onValueChange = { onUserActivity(); viewModel.setQuery(it) },
+                label = { Text("Search Vault") },
+                supportingText = { Text("Title, username/email, type, URL or notes") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
             LazyColumn(contentPadding = PaddingValues(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(list, key = { it.id }) { item ->
                     Card(modifier = Modifier.fillMaxWidth().clickable { onUserActivity(); selected = item }) {
@@ -336,34 +344,105 @@ private fun AddCredentialDialog(onDismiss: () -> Unit, onSave: (Credential) -> U
     var url by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
 
+    val canSave = title.isNotBlank() && username.isNotBlank() && password.isNotBlank()
+
     AlertDialog(
         onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Add Credential",
+                style = MaterialTheme.typography.headlineSmall
+            )
+        },
         confirmButton = {
-            Button(onClick = {
-                onSave(
-                    Credential(
-                        title = title,
-                        username = username,
-                        password = password,
-                        category = category,
-                        url = url.ifBlank { null },
-                        notes = notes.ifBlank { null }
+            Button(
+                enabled = canSave,
+                onClick = {
+                    onSave(
+                        Credential(
+                            title = title.trim(),
+                            username = username.trim(),
+                            password = password,
+                            category = category.trim().ifBlank { "General" },
+                            url = url.trim().ifBlank { null },
+                            notes = notes.trim().ifBlank { null }
+                        )
                     )
-                )
-            }) { Text("Save") }
+                },
+                shape = RoundedCornerShape(14.dp)
+            ) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(title, { title = it }, label = { Text("Title") })
-                OutlinedTextField(username, { username = it }, label = { Text("Username") })
-                OutlinedTextField(password, { password = it }, label = { Text("Password") })
-                TextButton(onClick = {
-                    password = PasswordGenerator.generate(16, upper = true, lower = true, digits = true, symbols = true)
-                }) { Text("Generate Password") }
-                OutlinedTextField(category, { category = it }, label = { Text("Category") })
-                OutlinedTextField(url, { url = it }, label = { Text("URL") })
-                OutlinedTextField(notes, { notes = it }, label = { Text("Notes") })
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Store login details securely in your vault.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = { username = it },
+                    label = { Text("Username / Email") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                FilledTonalButton(
+                    onClick = {
+                        password = PasswordGenerator.generate(16, upper = true, lower = true, digits = true, symbols = true)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Generate Strong Password")
+                }
+                OutlinedTextField(
+                    value = category,
+                    onValueChange = { category = it },
+                    label = { Text("Type / Category") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text("URL (optional)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Notes (optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 5,
+                    shape = RoundedCornerShape(14.dp)
+                )
             }
         }
     )

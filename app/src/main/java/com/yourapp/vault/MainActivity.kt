@@ -83,9 +83,8 @@ class MainActivity : FragmentActivity() {
                             val biometricManager = BiometricManager.from(this@MainActivity)
                             val allowedAuthenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
                                 BiometricManager.Authenticators.BIOMETRIC_WEAK
-                            if (biometricManager.canAuthenticate(allowedAuthenticators) != BiometricManager.BIOMETRIC_SUCCESS) {
-                                onResult("Biometric authentication is not available")
-                            } else {
+                            when (biometricManager.canAuthenticate(allowedAuthenticators)) {
+                                BiometricManager.BIOMETRIC_SUCCESS -> {
                                 val executor = ContextCompat.getMainExecutor(this@MainActivity)
                                 val promptInfo = BiometricPrompt.PromptInfo.Builder()
                                     .setTitle("Unlock Cryptora")
@@ -113,7 +112,14 @@ class MainActivity : FragmentActivity() {
                                         }
 
                                         override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                                            onResult(errString.toString())
+                                            if (errorCode == BiometricPrompt.ERROR_USER_CANCELED ||
+                                                errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON ||
+                                                errorCode == BiometricPrompt.ERROR_CANCELED
+                                            ) {
+                                                onResult("Biometric canceled. Use master password.")
+                                            } else {
+                                                onResult(errString.toString())
+                                            }
                                         }
 
                                         override fun onAuthenticationFailed() {
@@ -123,6 +129,11 @@ class MainActivity : FragmentActivity() {
                                 )
 
                                 biometricPrompt.authenticate(promptInfo)
+                                }
+                                BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> onResult("No biometric enrolled. Use master password.")
+                                BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE,
+                                BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> onResult("Biometric authentication is not available")
+                                else -> onResult("Biometric authentication is currently unavailable")
                             }
                         },
                         onBiometricToggle = appContainer::setBiometricEnabled,

@@ -40,6 +40,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -208,6 +209,16 @@ private fun UnlockScreen(
 ) {
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var attemptedBiometric by remember { mutableStateOf(false) }
+
+    LaunchedEffect(biometricEnabled, lockoutMs) {
+        if (biometricEnabled && lockoutMs == 0L && !attemptedBiometric) {
+            attemptedBiometric = true
+            onBiometricUnlock { unlockError ->
+                error = unlockError
+            }
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Unlock Vault")
@@ -239,7 +250,7 @@ private fun UnlockScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
-            ) { Text("Unlock with Biometrics") }
+            ) { Text("Try Biometrics Again") }
         }
         error?.let { Text(it) }
     }

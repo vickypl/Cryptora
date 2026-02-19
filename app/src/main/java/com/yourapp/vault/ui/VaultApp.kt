@@ -56,6 +56,7 @@ import com.yourapp.vault.security.PasswordGenerator
 import com.yourapp.vault.util.SecureClipboard
 import com.yourapp.vault.viewmodel.VaultViewModel
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 @Composable
 fun VaultApp(
@@ -263,6 +264,7 @@ private fun VaultHome(
     val query by viewModel.query.collectAsStateWithLifecycleCompat()
     var adding by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<Credential?>(null) }
+    var editing by remember { mutableStateOf<Credential?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -312,13 +314,25 @@ private fun VaultHome(
         )
     }
 
+    editing?.let { item ->
+        AddCredentialDialog(
+            initialCredential = item,
+            onDismiss = { editing = null },
+            onSave = {
+                onUserActivity()
+                viewModel.save(it)
+                editing = null
+            }
+        )
+    }
+
     selected?.let { item ->
         CredentialDetailDialog(
             credential = item,
             onDismiss = { selected = null },
-            onDelete = {
+            onEdit = {
                 onUserActivity()
-                viewModel.delete(item)
+                editing = item
                 selected = null
             },
             onCopyPassword = {
@@ -336,21 +350,26 @@ private fun VaultHome(
 }
 
 @Composable
-private fun AddCredentialDialog(onDismiss: () -> Unit, onSave: (Credential) -> Unit) {
-    var title by remember { mutableStateOf("") }
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("General") }
-    var url by remember { mutableStateOf("") }
-    var notes by remember { mutableStateOf("") }
+private fun AddCredentialDialog(
+    initialCredential: Credential? = null,
+    onDismiss: () -> Unit,
+    onSave: (Credential) -> Unit
+) {
+    var title by remember { mutableStateOf(initialCredential?.title.orEmpty()) }
+    var username by remember { mutableStateOf(initialCredential?.username.orEmpty()) }
+    var password by remember { mutableStateOf(initialCredential?.password.orEmpty()) }
+    var category by remember { mutableStateOf(initialCredential?.category ?: "General") }
+    var url by remember { mutableStateOf(initialCredential?.url.orEmpty()) }
+    var notes by remember { mutableStateOf(initialCredential?.notes.orEmpty()) }
 
     val canSave = title.isNotBlank() && username.isNotBlank() && password.isNotBlank()
+    val isEditing = initialCredential != null
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Add Credential",
+                text = if (isEditing) "Edit Credential" else "Add Credential",
                 style = MaterialTheme.typography.headlineSmall
             )
         },
@@ -360,6 +379,8 @@ private fun AddCredentialDialog(onDismiss: () -> Unit, onSave: (Credential) -> U
                 onClick = {
                     onSave(
                         Credential(
+                            id = initialCredential?.id ?: UUID.randomUUID().toString(),
+                            createdAt = initialCredential?.createdAt ?: System.currentTimeMillis(),
                             title = title.trim(),
                             username = username.trim(),
                             password = password,
@@ -370,9 +391,9 @@ private fun AddCredentialDialog(onDismiss: () -> Unit, onSave: (Credential) -> U
                     )
                 },
                 shape = RoundedCornerShape(14.dp)
-            ) { Text("Save") }
+            ) { Text(if (isEditing) "Update" else "Save") }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
         text = {
             Column(
                 modifier = Modifier
@@ -381,7 +402,7 @@ private fun AddCredentialDialog(onDismiss: () -> Unit, onSave: (Credential) -> U
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Store login details securely in your vault.",
+                    text = if (isEditing) "Update your login details." else "Store login details securely in your vault.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -396,7 +417,7 @@ private fun AddCredentialDialog(onDismiss: () -> Unit, onSave: (Credential) -> U
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text("Username / Email") },
+                    label = { Text("Login / Email") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp)
@@ -452,29 +473,59 @@ private fun AddCredentialDialog(onDismiss: () -> Unit, onSave: (Credential) -> U
 private fun CredentialDetailDialog(
     credential: Credential,
     onDismiss: () -> Unit,
-    onDelete: () -> Unit,
+    onEdit: () -> Unit,
     onCopyPassword: () -> Unit,
     onCopyUsername: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { Button(onClick = onCopyPassword) { Text("Copy Password") } },
-        dismissButton = {
-            Row {
-                TextButton(onClick = onCopyUsername) { Text("Copy Username/Email") }
-                TextButton(onClick = onDelete) { Text("Delete") }
-                TextButton(onClick = onDismiss) { Text("Close") }
+        title = {
+            Text(
+                text = credential.title,
+                style = MaterialTheme.typography.headlineSmall
+            )
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onEdit) { Text("Edit") }
+                Button(onClick = onDismiss, shape = RoundedCornerShape(12.dp)) { Text("Close") }
             }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Title: ${credential.title}")
-                Text("Username: ${credential.username}")
-                Text("Password: ••••••••")
-                credential.url?.let { Text("URL: $it") }
-                credential.notes?.let { Text("Notes: $it") }
-                Text("Category: ${credential.category}")
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                DetailLineWithCopy(
+                    label = "Login",
+                    value = credential.username,
+                    onCopy = onCopyUsername
+                )
+                DetailLineWithCopy(
+                    label = "Password",
+                    value = credential.password,
+                    onCopy = onCopyPassword
+                )
+                credential.url?.takeIf { it.isNotBlank() }?.let {
+                    Text("URL: $it", style = MaterialTheme.typography.bodyMedium)
+                }
+                credential.notes?.takeIf { it.isNotBlank() }?.let {
+                    Text("Notes: $it", style = MaterialTheme.typography.bodyMedium)
+                }
+                Text("Type: ${credential.category}", style = MaterialTheme.typography.bodyMedium)
             }
         }
     )
+}
+
+@Composable
+private fun DetailLineWithCopy(label: String, value: String, onCopy: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.bodyLarge)
+        }
+        TextButton(onClick = onCopy) { Text("Copy") }
+    }
 }

@@ -69,6 +69,7 @@ fun VaultApp(
     onUnlock: (password: String?, pin: String?) -> String?,
     onBiometricToggle: (Boolean) -> Unit,
     onRequireLock: () -> Unit,
+    onUserActivity: () -> Unit,
     lockoutMs: Long,
     vaultViewModel: VaultViewModel?
 ) {
@@ -78,15 +79,15 @@ fun VaultApp(
         label = "vault-navigation"
     ) { (isSetupDone, isUnlocked, vm) ->
         when {
-            !isSetupDone -> SetupScreen(onSetup)
-            !isUnlocked -> UnlockScreen(onUnlock = onUnlock, lockoutMs = lockoutMs)
-            else -> VaultHome(rooted, biometricEnabled, onBiometricToggle, onRequireLock, vm)
+            !isSetupDone -> SetupScreen(onSetup, onUserActivity)
+            !isUnlocked -> UnlockScreen(onUnlock = onUnlock, lockoutMs = lockoutMs, onUserActivity = onUserActivity)
+            else -> VaultHome(rooted, biometricEnabled, onBiometricToggle, onRequireLock, onUserActivity, vm)
         }
     }
 }
 
 @Composable
-private fun SetupScreen(onSetup: (String, String?) -> Result<Unit>) {
+private fun SetupScreen(onSetup: (String, String?) -> Result<Unit>, onUserActivity: () -> Unit) {
     var master by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -129,6 +130,7 @@ private fun SetupScreen(onSetup: (String, String?) -> Result<Unit>) {
                 OutlinedTextField(
                     value = master,
                     onValueChange = {
+                        onUserActivity()
                         master = it
                         if (error != null) error = null
                     },
@@ -141,6 +143,7 @@ private fun SetupScreen(onSetup: (String, String?) -> Result<Unit>) {
                 OutlinedTextField(
                     value = pin,
                     onValueChange = {
+                        onUserActivity()
                         pin = it.filter(Char::isDigit)
                         if (error != null) error = null
                     },
@@ -162,6 +165,7 @@ private fun SetupScreen(onSetup: (String, String?) -> Result<Unit>) {
 
                 Button(
                     onClick = {
+                        onUserActivity()
                         val validationError = validateSetupInput(master, pin)
                         if (validationError != null) {
                             error = validationError
@@ -212,7 +216,7 @@ private fun validateSetupInput(master: String, pin: String): String? {
 }
 
 @Composable
-private fun UnlockScreen(onUnlock: (String?, String?) -> String?, lockoutMs: Long) {
+private fun UnlockScreen(onUnlock: (String?, String?) -> String?, lockoutMs: Long, onUserActivity: () -> Unit) {
     var password by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -222,11 +226,12 @@ private fun UnlockScreen(onUnlock: (String?, String?) -> String?, lockoutMs: Lon
         if (lockoutMs > 0) {
             Text("Too many failed attempts. Retry in ${lockoutMs / 1000}s")
         }
-        OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Master Password") })
-        OutlinedTextField(value = pin, onValueChange = { pin = it }, label = { Text("PIN") })
+        OutlinedTextField(value = password, onValueChange = { onUserActivity(); password = it }, label = { Text("Master Password") })
+        OutlinedTextField(value = pin, onValueChange = { onUserActivity(); pin = it }, label = { Text("PIN") })
         Button(
             enabled = lockoutMs == 0L,
             onClick = {
+                onUserActivity()
                 error = onUnlock(password.ifBlank { null }, pin.ifBlank { null })
             }
         ) { Text("Unlock") }
@@ -241,6 +246,7 @@ private fun VaultHome(
     biometricEnabled: Boolean,
     onBiometricToggle: (Boolean) -> Unit,
     onRequireLock: () -> Unit,
+    onUserActivity: () -> Unit,
     viewModel: VaultViewModel?
 ) {
     if (viewModel == null) {
@@ -259,19 +265,19 @@ private fun VaultHome(
 
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbar) },
-        floatingActionButton = { FloatingActionButton(onClick = { adding = true }) { Text("+") } }
+        floatingActionButton = { FloatingActionButton(onClick = { onUserActivity(); adding = true }) { Text("+") } }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (rooted) Text("Warning: rooted device detected")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Biometric")
-                Switch(checked = biometricEnabled, onCheckedChange = onBiometricToggle)
-                TextButton(onClick = onRequireLock) { Text("Lock") }
+                Switch(checked = biometricEnabled, onCheckedChange = { onUserActivity(); onBiometricToggle(it) })
+                TextButton(onClick = { onUserActivity(); onRequireLock() }) { Text("Lock") }
             }
-            OutlinedTextField(value = query, onValueChange = viewModel::setQuery, label = { Text("Search") }, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(value = query, onValueChange = { onUserActivity(); viewModel.setQuery(it) }, label = { Text("Search") }, modifier = Modifier.fillMaxWidth())
             LazyColumn(contentPadding = PaddingValues(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(list, key = { it.id }) { item ->
-                    Card(modifier = Modifier.fillMaxWidth().clickable { selected = item }) {
+                    Card(modifier = Modifier.fillMaxWidth().clickable { onUserActivity(); selected = item }) {
                         Column(Modifier.padding(12.dp)) {
                             Text(item.title)
                             Text(item.username)
@@ -287,6 +293,7 @@ private fun VaultHome(
         AddCredentialDialog(
             onDismiss = { adding = false },
             onSave = {
+                onUserActivity()
                 viewModel.save(it)
                 adding = false
             }
@@ -298,10 +305,12 @@ private fun VaultHome(
             credential = item,
             onDismiss = { selected = null },
             onDelete = {
+                onUserActivity()
                 viewModel.delete(item)
                 selected = null
             },
             onCopyPassword = {
+                onUserActivity()
                 secureClipboard.copyPassword(item.password)
                 scope.launch { snackbar.showSnackbar("Password copied and will clear in 15s") }
             }

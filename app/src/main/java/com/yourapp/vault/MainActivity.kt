@@ -81,6 +81,7 @@ class MainActivity : ComponentActivity() {
                         },
                         onBiometricToggle = appContainer::setBiometricEnabled,
                         onRequireLock = { sessionVm.lock() },
+                        onUserActivity = { sessionVm.markActive() },
                         lockoutMs = appContainer.authManager.lockoutRemainingMs(),
                         vaultViewModel = vaultViewModel
                     )
@@ -96,8 +97,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onPause() {
-        super.onPause()
-        ViewModelProvider(this)[SessionViewModel::class.java].lock()
-    }
 }

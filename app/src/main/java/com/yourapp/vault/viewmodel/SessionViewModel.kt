@@ -23,7 +23,7 @@ class SessionViewModel : ViewModel() {
         lastActiveAt = System.currentTimeMillis()
     }
 
-    fun lockIfInactive(timeoutMs: Long = 30_000L) {
+    fun lockIfInactive(timeoutMs: Long = 180_000L) {
         if (_isUnlocked.value && System.currentTimeMillis() - lastActiveAt > timeoutMs) {
             lock()
         }

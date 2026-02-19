@@ -17,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.viewmodel.CreationExtras
 import com.yourapp.vault.security.RootDetection
 import com.yourapp.vault.ui.VaultApp
 import com.yourapp.vault.viewmodel.SessionViewModel
@@ -61,17 +60,24 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         onUnlock = { password, pin ->
-                            val success = when {
-                                !password.isNullOrBlank() -> appContainer.authManager.verifyMasterPassword(password.toCharArray())
-                                !pin.isNullOrBlank() -> appContainer.authManager.verifyPin(pin.toCharArray())
-                                else -> false
-                            }
-                            if (success) {
-                                val dbKey = appContainer.authManager.openDbKey() ?: return@VaultApp false
+                            runCatching {
+                                val success = when {
+                                    !password.isNullOrBlank() -> appContainer.authManager.verifyMasterPassword(password.toCharArray())
+                                    !pin.isNullOrBlank() -> appContainer.authManager.verifyPin(pin.toCharArray())
+                                    else -> false
+                                }
+                                if (!success) {
+                                    return@runCatching "Authentication failed"
+                                }
+
+                                val dbKey = appContainer.authManager.openDbKey()
+                                    ?: return@runCatching "Unable to access vault key"
                                 vaultViewModel = VaultViewModel(appContainer.createRepository(dbKey))
                                 sessionVm.unlock()
+                                null
+                            }.getOrElse {
+                                "Unable to unlock vault. Please try again."
                             }
-                            success
                         },
                         onBiometricToggle = appContainer::setBiometricEnabled,
                         onRequireLock = { sessionVm.lock() },

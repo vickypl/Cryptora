@@ -66,7 +66,7 @@ fun VaultApp(
     unlocked: Boolean,
     biometricEnabled: Boolean,
     onSetup: (master: String, pin: String?) -> Result<Unit>,
-    onUnlock: (password: String?, pin: String?) -> Boolean,
+    onUnlock: (password: String?, pin: String?) -> String?,
     onBiometricToggle: (Boolean) -> Unit,
     onRequireLock: () -> Unit,
     lockoutMs: Long,
@@ -212,7 +212,7 @@ private fun validateSetupInput(master: String, pin: String): String? {
 }
 
 @Composable
-private fun UnlockScreen(onUnlock: (String?, String?) -> Boolean, lockoutMs: Long) {
+private fun UnlockScreen(onUnlock: (String?, String?) -> String?, lockoutMs: Long) {
     var password by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -227,8 +227,7 @@ private fun UnlockScreen(onUnlock: (String?, String?) -> Boolean, lockoutMs: Lon
         Button(
             enabled = lockoutMs == 0L,
             onClick = {
-                val success = onUnlock(password.ifBlank { null }, pin.ifBlank { null })
-                if (!success) error = "Authentication failed"
+                error = onUnlock(password.ifBlank { null }, pin.ifBlank { null })
             }
         ) { Text("Unlock") }
         error?.let { Text(it) }

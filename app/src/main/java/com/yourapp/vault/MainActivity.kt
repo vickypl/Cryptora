@@ -164,7 +164,9 @@ class MainActivity : FragmentActivity() {
                             appContainer.setSelectedSessionLimit(limit)
                             currentSessionLimitMs = sessionLimitMsFor(limit)
                         },
-                        onChangeMasterPassword = appContainer::changeMasterPassword,
+                        onChangeMasterPassword = { current, next ->
+                            appContainer.changeMasterPassword(current, next)
+                        },
                         onRequireLock = { sessionVm.lock() },
                         onUserActivity = { sessionVm.markActive() },
                         lockoutMs = appContainer.authManager.lockoutRemainingMs(),

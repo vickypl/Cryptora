@@ -86,7 +86,7 @@ fun VaultApp(
     onThemeChange: (String) -> Unit,
     selectedSessionLimit: String,
     onSessionLimitChange: (String) -> Unit,
-    onChangeMasterPassword: (next: String) -> String?,
+    onChangeMasterPassword: (current: String, next: String) -> String?,
     onRequireLock: () -> Unit,
     onUserActivity: () -> Unit,
     lockoutMs: Long,
@@ -360,7 +360,7 @@ private fun VaultHome(
     onThemeChange: (String) -> Unit,
     selectedSessionLimit: String,
     onSessionLimitChange: (String) -> Unit,
-    onChangeMasterPassword: (next: String) -> String?,
+    onChangeMasterPassword: (current: String, next: String) -> String?,
     onRequireLock: () -> Unit,
     onUserActivity: () -> Unit,
     sessionRemainingMs: Long,
@@ -470,9 +470,9 @@ private fun VaultHome(
                 onUserActivity()
                 onSessionLimitChange(it)
             },
-            onChangeMasterPassword = { next ->
+            onChangeMasterPassword = { current, next ->
                 onUserActivity()
-                onChangeMasterPassword(next)
+                onChangeMasterPassword(current, next)
             },
             onDismiss = { settingsOpen = false }
         )
@@ -725,9 +725,10 @@ private fun SettingsDialog(
     onThemeSelected: (String) -> Unit,
     selectedSessionLimit: String,
     onSessionLimitSelected: (String) -> Unit,
-    onChangeMasterPassword: (next: String) -> String?,
+    onChangeMasterPassword: (current: String, next: String) -> String?,
     onDismiss: () -> Unit
 ) {
+    var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordError by remember { mutableStateOf<String?>(null) }
@@ -801,6 +802,15 @@ private fun SettingsDialog(
 
                 Text("Change Master Password", style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
+                    value = currentPassword,
+                    onValueChange = { currentPassword = it; passwordError = null },
+                    label = { Text("Current Master Password") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                OutlinedTextField(
                     value = newPassword,
                     onValueChange = { newPassword = it; passwordError = null },
                     label = { Text("New Master Password") },
@@ -821,13 +831,15 @@ private fun SettingsDialog(
                 Button(
                     onClick = {
                         passwordError = when {
+                            currentPassword.isBlank() -> "Current master password is required"
                             newPassword != confirmPassword -> "New password and confirm password do not match"
-                            else -> onChangeMasterPassword(newPassword)
+                            else -> onChangeMasterPassword(currentPassword, newPassword)
                         }
                         if (passwordError == null) {
+                            currentPassword = ""
                             newPassword = ""
                             confirmPassword = ""
-                            passwordError = "Master password updated successfully"
+                            passwordError = "Successfully updated"
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),

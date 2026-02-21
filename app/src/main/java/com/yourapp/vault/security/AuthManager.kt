@@ -40,13 +40,19 @@ class AuthManager(
     }
 
 
-    fun changeMasterPassword(newPassword: CharArray): String? {
+    fun changeMasterPassword(currentPassword: CharArray, newPassword: CharArray): String? {
+        val salt = secureStorage.getSalt() ?: return "Vault configuration missing"
+        val expectedHash = secureStorage.getMasterHash() ?: return "Vault configuration missing"
+        val currentHash = KeyDerivation.derive(currentPassword, salt)
+        if (!MessageDigest.isEqual(currentHash, expectedHash)) {
+            return "Current master password is incorrect"
+        }
+
         val validationError = validatePasswordStrength(newPassword)
         if (validationError != null) {
             return validationError
         }
 
-        val salt = secureStorage.getSalt() ?: return "Vault configuration missing"
         secureStorage.setMasterHash(KeyDerivation.derive(newPassword, salt))
         return null
     }

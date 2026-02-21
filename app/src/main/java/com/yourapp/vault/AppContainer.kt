@@ -20,8 +20,8 @@ class AppContainer(private val context: Context) {
     fun selectedSessionLimit(): String = storage.getSessionLimit()
     fun setSelectedSessionLimit(limit: String) = storage.setSessionLimit(limit)
 
-    fun changeMasterPassword(newPassword: String): String? {
-        return authManager.changeMasterPassword(newPassword.toCharArray())
+    fun changeMasterPassword(currentPassword: String, newPassword: String): String? {
+        return authManager.changeMasterPassword(currentPassword.toCharArray(), newPassword.toCharArray())
     }
 
     fun createRepository(dbKey: ByteArray): VaultRepository {

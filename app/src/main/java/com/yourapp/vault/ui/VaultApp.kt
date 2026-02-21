@@ -82,6 +82,7 @@ fun VaultApp(
     onRequireLock: () -> Unit,
     onUserActivity: () -> Unit,
     lockoutMs: Long,
+    sessionRemainingMs: Long,
     vaultViewModel: VaultViewModel?
 ) {
     AnimatedContent(
@@ -107,6 +108,7 @@ fun VaultApp(
                 onBiometricToggle = onBiometricToggle,
                 onRequireLock = onRequireLock,
                 onUserActivity = onUserActivity,
+                sessionRemainingMs = sessionRemainingMs,
                 viewModel = vm
             )
         }
@@ -349,6 +351,7 @@ private fun VaultHome(
     onChangeMasterPassword: (next: String) -> String?,
     onRequireLock: () -> Unit,
     onUserActivity: () -> Unit,
+    sessionRemainingMs: Long,
     viewModel: VaultViewModel?
 ) {
     if (viewModel == null) {
@@ -379,6 +382,11 @@ private fun VaultHome(
             ) {
                 Column {
                     Text("Vault", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        text = "Auto-lock in ${formatRemainingTime(sessionRemainingMs)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     if (rooted) {
                         Text("Warning: rooted device detected", color = MaterialTheme.colorScheme.error)
                     }
@@ -471,12 +479,12 @@ private fun VaultHome(
             onCopyPassword = {
                 onUserActivity()
                 secureClipboard.copyPassword(item.password)
-                scope.launch { snackbar.showSnackbar("Password copied and will clear in 15s") }
+                scope.launch { snackbar.showSnackbar("Password copied and will clear in 60s") }
             },
             onCopyUsername = {
                 onUserActivity()
                 secureClipboard.copyUsernameOrEmail(item.username)
-                scope.launch { snackbar.showSnackbar("Username/email copied and will clear in 15s") }
+                scope.launch { snackbar.showSnackbar("Username/email copied and will clear in 60s") }
             }
         )
     }
@@ -788,6 +796,14 @@ private val appThemeOptions = listOf(
     ThemeOption("FOREST", "Forest Night"),
     ThemeOption("INDIGO", "Indigo")
 )
+
+
+private fun formatRemainingTime(ms: Long): String {
+    val totalSeconds = (ms / 1000).coerceAtLeast(0)
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return String.format("%02d:%02d", minutes, seconds)
+}
 
 
 @Composable

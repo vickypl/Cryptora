@@ -9,14 +9,17 @@ class SessionViewModel : ViewModel() {
     val isUnlocked = _isUnlocked.asStateFlow()
 
     private var lastActiveAt: Long = 0L
+    private var unlockedAt: Long = 0L
 
     fun unlock() {
         _isUnlocked.value = true
+        unlockedAt = System.currentTimeMillis()
         markActive()
     }
 
     fun lock() {
         _isUnlocked.value = false
+        unlockedAt = 0L
     }
 
     fun markActive() {
@@ -25,6 +28,18 @@ class SessionViewModel : ViewModel() {
 
     fun lockIfInactive(timeoutMs: Long = 180_000L) {
         if (_isUnlocked.value && System.currentTimeMillis() - lastActiveAt > timeoutMs) {
+            lock()
+        }
+    }
+
+    fun sessionRemainingMs(maxSessionMs: Long = 300_000L): Long {
+        if (!_isUnlocked.value || unlockedAt == 0L) return maxSessionMs
+        val elapsed = System.currentTimeMillis() - unlockedAt
+        return (maxSessionMs - elapsed).coerceAtLeast(0)
+    }
+
+    fun lockIfSessionExpired(maxSessionMs: Long = 300_000L) {
+        if (_isUnlocked.value && sessionRemainingMs(maxSessionMs) <= 0L) {
             lock()
         }
     }

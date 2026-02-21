@@ -46,6 +46,7 @@ class MainActivity : FragmentActivity() {
                     var vaultViewModel by remember { mutableStateOf<VaultViewModel?>(null) }
                     var setupDone by remember { mutableStateOf(appContainer.isSetupDone()) }
                     val unlocked by sessionVm.isUnlocked.collectAsState()
+                    var sessionRemainingMs by remember { mutableStateOf(300_000L) }
 
                     LaunchedEffect(unlocked) {
                         if (unlocked) {
@@ -53,6 +54,14 @@ class MainActivity : FragmentActivity() {
                         }
                     }
 
+
+                    LaunchedEffect(unlocked) {
+                        while (unlocked) {
+                            sessionRemainingMs = sessionVm.sessionRemainingMs()
+                            delay(1_000)
+                        }
+                        sessionRemainingMs = 300_000L
+                    }
                     VaultApp(
                         setupDone = setupDone,
                         rooted = RootDetection.isRooted(),
@@ -150,6 +159,7 @@ class MainActivity : FragmentActivity() {
                         onRequireLock = { sessionVm.lock() },
                         onUserActivity = { sessionVm.markActive() },
                         lockoutMs = appContainer.authManager.lockoutRemainingMs(),
+                        sessionRemainingMs = sessionRemainingMs,
                         vaultViewModel = vaultViewModel
                     )
                 }
@@ -158,8 +168,9 @@ class MainActivity : FragmentActivity() {
 
         lifecycleScope.launch {
             while (true) {
-                delay(5_000)
+                delay(1_000)
                 sessionVm.lockIfInactive()
+                sessionVm.lockIfSessionExpired()
             }
         }
     }

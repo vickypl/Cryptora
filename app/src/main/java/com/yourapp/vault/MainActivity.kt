@@ -168,43 +168,43 @@ class MainActivity : FragmentActivity() {
 
 private fun colorSchemeFor(theme: String) = when (theme) {
     "MIDNIGHT" -> darkColorScheme(
-        primary = Color(0xFF8FA8FF),
-        secondary = Color(0xFF9DB5C9),
-        tertiary = Color(0xFFA9C4A0),
-        surface = Color(0xFF10131A),
-        background = Color(0xFF0C0F15)
+        primary = Color(0xFF4F7DFF),
+        secondary = Color(0xFF6C88B7),
+        tertiary = Color(0xFF6A8C7A),
+        surface = Color(0xFF131A24),
+        background = Color(0xFF0C1118)
     )
 
     "SLATE" -> darkColorScheme(
-        primary = Color(0xFF8BA1B8),
-        secondary = Color(0xFF9AA8B8),
-        tertiary = Color(0xFF8EB0A0),
-        surface = Color(0xFF14171C),
-        background = Color(0xFF101317)
+        primary = Color(0xFF3E6A8E),
+        secondary = Color(0xFF5F7D95),
+        tertiary = Color(0xFF6A8F89),
+        surface = Color(0xFF171C22),
+        background = Color(0xFF11161B)
     )
 
     "GRAPHITE" -> darkColorScheme(
-        primary = Color(0xFFA7AFC0),
-        secondary = Color(0xFFB0B6C2),
-        tertiary = Color(0xFF95A79E),
-        surface = Color(0xFF151515),
-        background = Color(0xFF0F0F10)
+        primary = Color(0xFF5D6672),
+        secondary = Color(0xFF7A838F),
+        tertiary = Color(0xFF6E7F76),
+        surface = Color(0xFF191B1F),
+        background = Color(0xFF121418)
     )
 
     "FOREST" -> darkColorScheme(
-        primary = Color(0xFF8FB2A0),
-        secondary = Color(0xFF97AA9D),
-        tertiary = Color(0xFFB2C19A),
-        surface = Color(0xFF111814),
-        background = Color(0xFF0D120F)
+        primary = Color(0xFF2F7D5A),
+        secondary = Color(0xFF4C8A72),
+        tertiary = Color(0xFF72946A),
+        surface = Color(0xFF111C17),
+        background = Color(0xFF0B140F)
     )
 
     "INDIGO" -> darkColorScheme(
-        primary = Color(0xFF9E9DDA),
-        secondary = Color(0xFF9FA8DA),
-        tertiary = Color(0xFF90A4AE),
-        surface = Color(0xFF14142A),
-        background = Color(0xFF0E0E1C)
+        primary = Color(0xFF5B57D9),
+        secondary = Color(0xFF7671C2),
+        tertiary = Color(0xFF5B7A9A),
+        surface = Color(0xFF17162A),
+        background = Color(0xFF0F0E1D)
     )
 
     else -> darkColorScheme()

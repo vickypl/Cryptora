@@ -26,6 +26,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -647,19 +648,22 @@ private fun CredentialDetailDialog(
             )
         },
         confirmButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onEdit) { Text("Edit") }
-                Button(onClick = onDismiss, shape = RoundedCornerShape(12.dp)) { Text("Close") }
-            }
-        },
-        dismissButton = {
-            Box(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 TextButton(
                     onClick = { confirmDelete = true },
-                    modifier = Modifier.align(Alignment.CenterStart)
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) { Text("Delete") }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onEdit) { Text("Edit") }
+                    Button(onClick = onDismiss, shape = RoundedCornerShape(12.dp)) { Text("Close") }
+                }
             }
         },
+        dismissButton = {},
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 DetailLineWithCopy(

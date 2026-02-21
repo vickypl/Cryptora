@@ -463,6 +463,11 @@ private fun VaultHome(
                 editing = item
                 selected = null
             },
+            onDelete = {
+                onUserActivity()
+                viewModel.delete(item)
+                selected = null
+            },
             onCopyPassword = {
                 onUserActivity()
                 secureClipboard.copyPassword(item.password)
@@ -602,9 +607,13 @@ private fun CredentialDetailDialog(
     credential: Credential,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
+    onDelete: () -> Unit,
     onCopyPassword: () -> Unit,
     onCopyUsername: () -> Unit
 ) {
+    var showPassword by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -619,6 +628,9 @@ private fun CredentialDetailDialog(
                 Button(onClick = onDismiss, shape = RoundedCornerShape(12.dp)) { Text("Close") }
             }
         },
+        dismissButton = {
+            TextButton(onClick = { confirmDelete = true }) { Text("Delete") }
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 DetailLineWithCopy(
@@ -626,11 +638,22 @@ private fun CredentialDetailDialog(
                     value = credential.username,
                     onCopy = onCopyUsername
                 )
-                DetailLineWithCopy(
-                    label = "Password",
-                    value = credential.password,
-                    onCopy = onCopyPassword
-                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Password", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (showPassword) credential.password else "*******", style = MaterialTheme.typography.bodyLarge)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TextButton(onClick = { showPassword = !showPassword }) { Text(if (showPassword) "Hide" else "View") }
+                        TextButton(onClick = onCopyPassword) { Text("Copy") }
+                    }
+                }
+
                 credential.url?.takeIf { it.isNotBlank() }?.let {
                     Text("URL: $it", style = MaterialTheme.typography.bodyMedium)
                 }
@@ -641,6 +664,23 @@ private fun CredentialDetailDialog(
             }
         }
     )
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete Credential") },
+            text = { Text("Are you sure you want to delete this record?") },
+            confirmButton = {
+                Button(onClick = {
+                    confirmDelete = false
+                    onDelete()
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text("Cancel") }
+            }
+        )
+    }
 }
 
 @Composable

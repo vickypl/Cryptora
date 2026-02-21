@@ -32,6 +32,8 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.HorizontalDivider
@@ -78,6 +80,8 @@ fun VaultApp(
     onBiometricToggle: (Boolean) -> Unit,
     selectedTheme: String,
     onThemeChange: (String) -> Unit,
+    selectedSessionLimit: String,
+    onSessionLimitChange: (String) -> Unit,
     onChangeMasterPassword: (next: String) -> String?,
     onRequireLock: () -> Unit,
     onUserActivity: () -> Unit,
@@ -104,6 +108,8 @@ fun VaultApp(
                 biometricEnabled = biometricEnabled,
                 selectedTheme = selectedTheme,
                 onThemeChange = onThemeChange,
+                selectedSessionLimit = selectedSessionLimit,
+                onSessionLimitChange = onSessionLimitChange,
                 onChangeMasterPassword = onChangeMasterPassword,
                 onBiometricToggle = onBiometricToggle,
                 onRequireLock = onRequireLock,
@@ -348,6 +354,8 @@ private fun VaultHome(
     onBiometricToggle: (Boolean) -> Unit,
     selectedTheme: String,
     onThemeChange: (String) -> Unit,
+    selectedSessionLimit: String,
+    onSessionLimitChange: (String) -> Unit,
     onChangeMasterPassword: (next: String) -> String?,
     onRequireLock: () -> Unit,
     onUserActivity: () -> Unit,
@@ -383,7 +391,7 @@ private fun VaultHome(
                 Column {
                     Text("Vault", style = MaterialTheme.typography.titleLarge)
                     Text(
-                        text = "Auto-lock in ${formatRemainingTime(sessionRemainingMs)}",
+                        text = if (sessionRemainingMs < 0) "Auto-lock: Not required" else "Auto-lock in ${formatRemainingTime(sessionRemainingMs)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -452,6 +460,11 @@ private fun VaultHome(
             onThemeSelected = {
                 onUserActivity()
                 onThemeChange(it)
+            },
+            selectedSessionLimit = selectedSessionLimit,
+            onSessionLimitSelected = {
+                onUserActivity()
+                onSessionLimitChange(it)
             },
             onChangeMasterPassword = { next ->
                 onUserActivity()
@@ -702,12 +715,15 @@ private fun SettingsDialog(
     selectedTheme: String,
     onBiometricToggle: (Boolean) -> Unit,
     onThemeSelected: (String) -> Unit,
+    selectedSessionLimit: String,
+    onSessionLimitSelected: (String) -> Unit,
     onChangeMasterPassword: (next: String) -> String?,
     onDismiss: () -> Unit
 ) {
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordError by remember { mutableStateOf<String?>(null) }
+    var sessionMenuExpanded by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -737,6 +753,35 @@ private fun SettingsDialog(
                         Text(option.label)
                     }
                 }
+
+                HorizontalDivider()
+
+                Text("Auto-lock Session", style = MaterialTheme.typography.titleMedium)
+                Box {
+                    OutlinedTextField(
+                        value = sessionLimitOptions.firstOrNull { it.key == selectedSessionLimit }?.label ?: "5m",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Session Timeout") },
+                        modifier = Modifier.fillMaxWidth().clickable { sessionMenuExpanded = true },
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    DropdownMenu(
+                        expanded = sessionMenuExpanded,
+                        onDismissRequest = { sessionMenuExpanded = false }
+                    ) {
+                        sessionLimitOptions.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option.label) },
+                                onClick = {
+                                    onSessionLimitSelected(option.key)
+                                    sessionMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
 
                 HorizontalDivider()
 
@@ -797,6 +842,15 @@ private val appThemeOptions = listOf(
     ThemeOption("INDIGO", "Indigo")
 )
 
+private data class SessionLimitOption(val key: String, val label: String)
+
+private val sessionLimitOptions = listOf(
+    SessionLimitOption("1m", "1m"),
+    SessionLimitOption("2m", "2m"),
+    SessionLimitOption("5m", "5m"),
+    SessionLimitOption("10m", "10m"),
+    SessionLimitOption("none", "Not required")
+)
 
 private fun formatRemainingTime(ms: Long): String {
     val totalSeconds = (ms / 1000).coerceAtLeast(0)

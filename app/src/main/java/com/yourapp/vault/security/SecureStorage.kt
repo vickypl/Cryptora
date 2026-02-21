@@ -39,6 +39,9 @@ class SecureStorage(context: Context) {
     fun setTheme(theme: String) = prefs.edit { putString("app_theme", theme) }
     fun getTheme(): String = prefs.getString("app_theme", "MIDNIGHT") ?: "MIDNIGHT"
 
+    fun setSessionLimit(limit: String) = prefs.edit { putString("session_limit", limit) }
+    fun getSessionLimit(): String = prefs.getString("session_limit", "5m") ?: "5m"
+
     fun setPinHash(pinHash: ByteArray?) = prefs.edit {
         if (pinHash == null) remove("pin_hash") else putString("pin_hash", pinHash.toB64())
     }

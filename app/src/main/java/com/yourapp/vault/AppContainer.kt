@@ -17,6 +17,8 @@ class AppContainer(private val context: Context) {
     fun setBiometricEnabled(enabled: Boolean) = storage.setBiometricEnabled(enabled)
     fun selectedTheme(): String = storage.getTheme()
     fun setSelectedTheme(theme: String) = storage.setTheme(theme)
+    fun selectedSessionLimit(): String = storage.getSessionLimit()
+    fun setSelectedSessionLimit(limit: String) = storage.setSessionLimit(limit)
 
     fun changeMasterPassword(newPassword: String): String? {
         return authManager.changeMasterPassword(newPassword.toCharArray())

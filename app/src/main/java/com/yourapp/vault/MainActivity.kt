@@ -37,16 +37,18 @@ class MainActivity : FragmentActivity() {
 
         val appContainer = AppContainer(applicationContext)
         val sessionVm = ViewModelProvider(this)[SessionViewModel::class.java]
+        var currentSessionLimitMs: Long? = sessionLimitMsFor(appContainer.selectedSessionLimit())
 
         setContent {
             var selectedTheme by remember { mutableStateOf(appContainer.selectedTheme()) }
+            var selectedSessionLimit by remember { mutableStateOf(appContainer.selectedSessionLimit()) }
 
             MaterialTheme(colorScheme = colorSchemeFor(selectedTheme)) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     var vaultViewModel by remember { mutableStateOf<VaultViewModel?>(null) }
                     var setupDone by remember { mutableStateOf(appContainer.isSetupDone()) }
                     val unlocked by sessionVm.isUnlocked.collectAsState()
-                    var sessionRemainingMs by remember { mutableStateOf(300_000L) }
+                    var sessionRemainingMs by remember { mutableStateOf(sessionLimitMsFor(selectedSessionLimit) ?: -1L) }
 
                     LaunchedEffect(unlocked) {
                         if (unlocked) {
@@ -55,12 +57,13 @@ class MainActivity : FragmentActivity() {
                     }
 
 
-                    LaunchedEffect(unlocked) {
+                    LaunchedEffect(unlocked, selectedSessionLimit) {
+                        val limitMs = sessionLimitMsFor(selectedSessionLimit)
                         while (unlocked) {
-                            sessionRemainingMs = sessionVm.sessionRemainingMs()
+                            sessionRemainingMs = limitMs?.let { sessionVm.sessionRemainingMs(it) } ?: -1L
                             delay(1_000)
                         }
-                        sessionRemainingMs = 300_000L
+                        sessionRemainingMs = limitMs ?: -1L
                     }
                     VaultApp(
                         setupDone = setupDone,
@@ -155,6 +158,12 @@ class MainActivity : FragmentActivity() {
                             selectedTheme = theme
                             appContainer.setSelectedTheme(theme)
                         },
+                        selectedSessionLimit = selectedSessionLimit,
+                        onSessionLimitChange = { limit ->
+                            selectedSessionLimit = limit
+                            appContainer.setSelectedSessionLimit(limit)
+                            currentSessionLimitMs = sessionLimitMsFor(limit)
+                        },
                         onChangeMasterPassword = appContainer::changeMasterPassword,
                         onRequireLock = { sessionVm.lock() },
                         onUserActivity = { sessionVm.markActive() },
@@ -170,11 +179,20 @@ class MainActivity : FragmentActivity() {
             while (true) {
                 delay(1_000)
                 sessionVm.lockIfInactive()
-                sessionVm.lockIfSessionExpired()
+                currentSessionLimitMs?.let { sessionVm.lockIfSessionExpired(it) }
             }
         }
     }
 
+}
+
+private fun sessionLimitMsFor(limit: String): Long? = when (limit) {
+    "1m" -> 60_000L
+    "2m" -> 120_000L
+    "5m" -> 300_000L
+    "10m" -> 600_000L
+    "none" -> null
+    else -> 300_000L
 }
 
 private fun colorSchemeFor(theme: String) = when (theme) {

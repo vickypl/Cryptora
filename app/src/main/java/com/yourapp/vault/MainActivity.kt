@@ -169,42 +169,77 @@ class MainActivity : FragmentActivity() {
 private fun colorSchemeFor(theme: String) = when (theme) {
     "MIDNIGHT" -> darkColorScheme(
         primary = Color(0xFF4F7DFF),
+        onPrimary = Color(0xFFFFFFFF),
         secondary = Color(0xFF6C88B7),
+        onSecondary = Color(0xFFFFFFFF),
         tertiary = Color(0xFF6A8C7A),
+        background = Color(0xFF0C1118),
+        onBackground = Color(0xFFE8EEF8),
         surface = Color(0xFF131A24),
-        background = Color(0xFF0C1118)
+        onSurface = Color(0xFFE8EEF8),
+        surfaceVariant = Color(0xFF1C2531),
+        primaryContainer = Color(0xFF203764),
+        secondaryContainer = Color(0xFF25384B)
     )
 
     "SLATE" -> darkColorScheme(
         primary = Color(0xFF3E6A8E),
+        onPrimary = Color(0xFFFFFFFF),
         secondary = Color(0xFF5F7D95),
+        onSecondary = Color(0xFFFFFFFF),
         tertiary = Color(0xFF6A8F89),
+        background = Color(0xFF11161B),
+        onBackground = Color(0xFFE7ECF0),
         surface = Color(0xFF171C22),
-        background = Color(0xFF11161B)
+        onSurface = Color(0xFFE7ECF0),
+        surfaceVariant = Color(0xFF222A33),
+        primaryContainer = Color(0xFF24435C),
+        secondaryContainer = Color(0xFF2C3D4A)
     )
 
     "GRAPHITE" -> darkColorScheme(
         primary = Color(0xFF5D6672),
+        onPrimary = Color(0xFFFFFFFF),
         secondary = Color(0xFF7A838F),
+        onSecondary = Color(0xFFFFFFFF),
         tertiary = Color(0xFF6E7F76),
+        background = Color(0xFF121418),
+        onBackground = Color(0xFFE6E8EC),
         surface = Color(0xFF191B1F),
-        background = Color(0xFF121418)
+        onSurface = Color(0xFFE6E8EC),
+        surfaceVariant = Color(0xFF25282E),
+        primaryContainer = Color(0xFF363C45),
+        secondaryContainer = Color(0xFF3F454E)
     )
 
     "FOREST" -> darkColorScheme(
         primary = Color(0xFF2F7D5A),
+        onPrimary = Color(0xFFFFFFFF),
         secondary = Color(0xFF4C8A72),
+        onSecondary = Color(0xFFFFFFFF),
         tertiary = Color(0xFF72946A),
+        background = Color(0xFF0B140F),
+        onBackground = Color(0xFFE5F1EA),
         surface = Color(0xFF111C17),
-        background = Color(0xFF0B140F)
+        onSurface = Color(0xFFE5F1EA),
+        surfaceVariant = Color(0xFF1D2A24),
+        primaryContainer = Color(0xFF1F4B38),
+        secondaryContainer = Color(0xFF2A5546)
     )
 
     "INDIGO" -> darkColorScheme(
         primary = Color(0xFF5B57D9),
+        onPrimary = Color(0xFFFFFFFF),
         secondary = Color(0xFF7671C2),
+        onSecondary = Color(0xFFFFFFFF),
         tertiary = Color(0xFF5B7A9A),
+        background = Color(0xFF0F0E1D),
+        onBackground = Color(0xFFE8E7FA),
         surface = Color(0xFF17162A),
-        background = Color(0xFF0F0E1D)
+        onSurface = Color(0xFFE8E7FA),
+        surfaceVariant = Color(0xFF23223A),
+        primaryContainer = Color(0xFF302F73),
+        secondaryContainer = Color(0xFF3A3961)
     )
 
     else -> darkColorScheme()

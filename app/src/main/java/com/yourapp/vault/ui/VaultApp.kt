@@ -78,7 +78,7 @@ fun VaultApp(
     onBiometricToggle: (Boolean) -> Unit,
     selectedTheme: String,
     onThemeChange: (String) -> Unit,
-    onChangeMasterPassword: (current: String, next: String) -> String?,
+    onChangeMasterPassword: (next: String) -> String?,
     onRequireLock: () -> Unit,
     onUserActivity: () -> Unit,
     lockoutMs: Long,
@@ -346,7 +346,7 @@ private fun VaultHome(
     onBiometricToggle: (Boolean) -> Unit,
     selectedTheme: String,
     onThemeChange: (String) -> Unit,
-    onChangeMasterPassword: (current: String, next: String) -> String?,
+    onChangeMasterPassword: (next: String) -> String?,
     onRequireLock: () -> Unit,
     onUserActivity: () -> Unit,
     viewModel: VaultViewModel?
@@ -445,9 +445,9 @@ private fun VaultHome(
                 onUserActivity()
                 onThemeChange(it)
             },
-            onChangeMasterPassword = { current, next ->
+            onChangeMasterPassword = { next ->
                 onUserActivity()
-                onChangeMasterPassword(current, next)
+                onChangeMasterPassword(next)
             },
             onDismiss = { settingsOpen = false }
         )
@@ -629,7 +629,12 @@ private fun CredentialDetailDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = { confirmDelete = true }) { Text("Delete") }
+            Box(modifier = Modifier.fillMaxWidth()) {
+                TextButton(
+                    onClick = { confirmDelete = true },
+                    modifier = Modifier.align(Alignment.CenterStart)
+                ) { Text("Delete") }
+            }
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -689,10 +694,9 @@ private fun SettingsDialog(
     selectedTheme: String,
     onBiometricToggle: (Boolean) -> Unit,
     onThemeSelected: (String) -> Unit,
-    onChangeMasterPassword: (current: String, next: String) -> String?,
+    onChangeMasterPassword: (next: String) -> String?,
     onDismiss: () -> Unit
 ) {
-    var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordError by remember { mutableStateOf<String?>(null) }
@@ -730,15 +734,6 @@ private fun SettingsDialog(
 
                 Text("Change Master Password", style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
-                    value = currentPassword,
-                    onValueChange = { currentPassword = it; passwordError = null },
-                    label = { Text("Current Master Password") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                OutlinedTextField(
                     value = newPassword,
                     onValueChange = { newPassword = it; passwordError = null },
                     label = { Text("New Master Password") },
@@ -760,10 +755,9 @@ private fun SettingsDialog(
                     onClick = {
                         passwordError = when {
                             newPassword != confirmPassword -> "New password and confirm password do not match"
-                            else -> onChangeMasterPassword(currentPassword, newPassword)
+                            else -> onChangeMasterPassword(newPassword)
                         }
                         if (passwordError == null) {
-                            currentPassword = ""
                             newPassword = ""
                             confirmPassword = ""
                             passwordError = "Master password updated successfully"

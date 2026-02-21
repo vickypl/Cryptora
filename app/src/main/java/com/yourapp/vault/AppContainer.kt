@@ -18,8 +18,8 @@ class AppContainer(private val context: Context) {
     fun selectedTheme(): String = storage.getTheme()
     fun setSelectedTheme(theme: String) = storage.setTheme(theme)
 
-    fun changeMasterPassword(currentPassword: String, newPassword: String): String? {
-        return authManager.changeMasterPassword(currentPassword.toCharArray(), newPassword.toCharArray())
+    fun changeMasterPassword(newPassword: String): String? {
+        return authManager.changeMasterPassword(newPassword.toCharArray())
     }
 
     fun createRepository(dbKey: ByteArray): VaultRepository {

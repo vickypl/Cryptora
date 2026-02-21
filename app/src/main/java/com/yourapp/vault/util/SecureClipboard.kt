@@ -18,7 +18,7 @@ class SecureClipboard(context: Context) {
     private fun copySensitive(label: String, value: String) {
         clipboardManager.setPrimaryClip(ClipData.newPlainText(label, value))
         CoroutineScope(Dispatchers.Main).launch {
-            delay(15_000)
+            delay(60_000)
             clipboardManager.clearPrimaryClip()
         }
     }

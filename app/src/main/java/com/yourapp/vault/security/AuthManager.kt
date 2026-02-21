@@ -40,11 +40,7 @@ class AuthManager(
     }
 
 
-    fun changeMasterPassword(currentPassword: CharArray, newPassword: CharArray): String? {
-        if (!verifyMasterPassword(currentPassword)) {
-            return "Current master password is incorrect"
-        }
-
+    fun changeMasterPassword(newPassword: CharArray): String? {
         val validationError = validatePasswordStrength(newPassword)
         if (validationError != null) {
             return validationError

@@ -37,7 +37,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.ExposedDropdownMenu
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.HorizontalDivider
@@ -781,7 +780,7 @@ private fun SettingsDialog(
                             .menuAnchor(),
                         shape = RoundedCornerShape(12.dp)
                     )
-                    ExposedDropdownMenu(
+                    DropdownMenu(
                         expanded = sessionMenuExpanded,
                         onDismissRequest = { sessionMenuExpanded = false }
                     ) {

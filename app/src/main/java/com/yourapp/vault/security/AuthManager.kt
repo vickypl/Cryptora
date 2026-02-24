@@ -39,6 +39,24 @@ class AuthManager(
         return success
     }
 
+
+    fun changeMasterPassword(currentPassword: CharArray, newPassword: CharArray): String? {
+        val salt = secureStorage.getSalt() ?: return "Vault configuration missing"
+        val expectedHash = secureStorage.getMasterHash() ?: return "Vault configuration missing"
+        val currentHash = KeyDerivation.derive(currentPassword, salt)
+        if (!MessageDigest.isEqual(currentHash, expectedHash)) {
+            return "Current master password is incorrect"
+        }
+
+        val validationError = validatePasswordStrength(newPassword)
+        if (validationError != null) {
+            return validationError
+        }
+
+        secureStorage.setMasterHash(KeyDerivation.derive(newPassword, salt))
+        return null
+    }
+
     fun openDbKey(): ByteArray? {
         val wrapped = secureStorage.getWrappedDbKey() ?: return null
         val iv = secureStorage.getWrappedDbIv() ?: return null
@@ -58,6 +76,16 @@ class AuthManager(
     fun lockoutRemainingMs(): Long {
         if (!isLockedOut()) return 0
         return (30_000 - (SystemClock.elapsedRealtime() - lockoutStartMs)).coerceAtLeast(0)
+    }
+
+
+    private fun validatePasswordStrength(password: CharArray): String? {
+        if (password.size < 12) return "New password must be at least 12 characters"
+        val value = String(password)
+        if (value.none(Char::isUpperCase) || value.none(Char::isLowerCase) || value.none(Char::isDigit) || !value.any { !it.isLetterOrDigit() }) {
+            return "Use uppercase, lowercase, number, and symbol in new password"
+        }
+        return null
     }
 
     private fun registerFailure() {

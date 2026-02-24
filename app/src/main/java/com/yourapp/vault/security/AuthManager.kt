@@ -17,7 +17,11 @@ class AuthManager(
         val dbKey = KeyDerivation.randomSalt(32)
 
         val (passwordWrappedDbKey, passwordWrappedDbIv) = keystoreManager.encryptWithDerivedKey(dbKey, derivedMasterKey)
-        val (wrappedByKeystore, wrappedByKeystoreIv) = keystoreManager.wrap(dbKey)
+        val (wrappedByKeystore, wrappedByKeystoreIv) = runCatching { keystoreManager.wrap(dbKey) }
+            .getOrElse {
+                Log.w(TAG, "Keystore wrap unavailable during setup; password unlock will still work", it)
+                byteArrayOf<Byte>() to byteArrayOf<Byte>()
+            }
 
         secureStorage.saveSetup(
             salt = salt,
@@ -89,6 +93,7 @@ class AuthManager(
     fun openDbKey(): ByteArray? {
         val wrappedByKeystore = secureStorage.getWrappedDbKey() ?: return null
         val wrappedByKeystoreIv = secureStorage.getWrappedDbIv() ?: return null
+        if (wrappedByKeystore.isEmpty() || wrappedByKeystoreIv.isEmpty()) return null
         return runCatching { keystoreManager.unwrap(wrappedByKeystore, wrappedByKeystoreIv) }.getOrNull()
     }
 

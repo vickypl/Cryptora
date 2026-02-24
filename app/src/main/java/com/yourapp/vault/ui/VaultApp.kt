@@ -68,7 +68,9 @@ import com.yourapp.vault.domain.model.Credential
 import com.yourapp.vault.security.PasswordGenerator
 import com.yourapp.vault.util.SecureClipboard
 import com.yourapp.vault.viewmodel.VaultViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 @Composable
@@ -129,6 +131,7 @@ private fun SetupScreen(onSetup: (String) -> Result<Unit>, onUserActivity: () ->
     var master by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var creatingVault by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     Box(
         modifier = Modifier
@@ -196,10 +199,13 @@ private fun SetupScreen(onSetup: (String) -> Result<Unit>, onUserActivity: () ->
                         }
 
                         creatingVault = true
-                        val result = onSetup(master)
-                        creatingVault = false
-                        if (result.isFailure) {
-                            error = result.exceptionOrNull()?.message ?: "Unable to create vault. Please try again."
+                        scope.launch {
+                            val result = withContext(Dispatchers.Default) { onSetup(master) }
+                            creatingVault = false
+                            if (result.isFailure) {
+                                error = result.exceptionOrNull()?.message
+                                    ?: "Unable to create vault. Please verify device lock/biometric and try again."
+                            }
                         }
                     },
                     enabled = !creatingVault,
@@ -220,12 +226,11 @@ private fun SetupScreen(onSetup: (String) -> Result<Unit>, onUserActivity: () ->
     }
 }
 
+private val MASTER_PASSWORD_REGEX = Regex("^(?=.*[A-Z])(?=.*[a-z])(?=.*\\d)(?=.*[^A-Za-z0-9]).{12,}$")
+
 private fun validateSetupInput(master: String): String? {
-    if (master.length < 12) {
-        return "Master password must be at least 12 characters."
-    }
-    if (master.none(Char::isUpperCase) || master.none(Char::isLowerCase) || master.none(Char::isDigit) || !master.any { !it.isLetterOrDigit() }) {
-        return "Use uppercase, lowercase, number, and symbol in master password."
+    if (!MASTER_PASSWORD_REGEX.matches(master)) {
+        return "Use a password like Example@1234"
     }
     return null
 }

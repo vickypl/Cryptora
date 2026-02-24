@@ -90,14 +90,11 @@ class MainActivity : FragmentActivity() {
                         },
                         onUnlock = { password ->
                             runCatching {
-                                val success = !password.isNullOrBlank() &&
-                                    appContainer.authManager.verifyMasterPassword(password.toCharArray())
-                                if (!success) {
+                                if (password.isNullOrBlank()) {
                                     return@runCatching "Authentication failed"
                                 }
-
-                                val dbKey = appContainer.authManager.openDbKey()
-                                    ?: return@runCatching "Device authentication required before vault key access"
+                                val dbKey = appContainer.authManager.openDbKey(password.toCharArray())
+                                    ?: return@runCatching "Authentication failed"
                                 vaultViewModel = VaultViewModel(appContainer.createRepository(dbKey))
                                 sessionVm.unlock()
                                 null

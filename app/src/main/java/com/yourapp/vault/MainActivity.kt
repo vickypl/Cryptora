@@ -1,6 +1,7 @@
 package com.yourapp.vault
 
 import android.os.Bundle
+import android.util.Log
 import android.view.WindowManager
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
@@ -23,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.yourapp.vault.security.RootDetection
+import com.yourapp.vault.security.TamperDetection
 import com.yourapp.vault.ui.VaultApp
 import com.yourapp.vault.viewmodel.SessionViewModel
 import com.yourapp.vault.viewmodel.VaultViewModel
@@ -36,6 +38,14 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
 
         val appContainer = AppContainer(applicationContext)
+        val debuggerAttached = TamperDetection.isDebuggerAttached()
+        val hookingDetected = TamperDetection.isHookingDetected()
+        if (debuggerAttached) {
+            Log.w("MainActivity", "Debugger detected. Sensitive operations should be restricted.")
+        }
+        if (hookingDetected) {
+            Log.w("MainActivity", "Hooking framework indicators detected.")
+        }
         val sessionVm = ViewModelProvider(this)[SessionViewModel::class.java]
         var currentSessionLimitMs: Long? = sessionLimitMsFor(appContainer.selectedSessionLimit())
 
@@ -87,7 +97,7 @@ class MainActivity : FragmentActivity() {
                                 }
 
                                 val dbKey = appContainer.authManager.openDbKey()
-                                    ?: return@runCatching "Unable to access vault key"
+                                    ?: return@runCatching "Device authentication required before vault key access"
                                 vaultViewModel = VaultViewModel(appContainer.createRepository(dbKey))
                                 sessionVm.unlock()
                                 null
@@ -96,16 +106,19 @@ class MainActivity : FragmentActivity() {
                             }
                         },
                         onBiometricUnlock = { onResult ->
-                            val biometricManager = BiometricManager.from(this@MainActivity)
+                            if (hookingDetected || debuggerAttached) {
+                                onResult("Sensitive operations disabled due to security risk detected")
+                            } else {
+                                val biometricManager = BiometricManager.from(this@MainActivity)
                             val allowedAuthenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
-                                BiometricManager.Authenticators.BIOMETRIC_WEAK
+                                BiometricManager.Authenticators.DEVICE_CREDENTIAL
                             when (biometricManager.canAuthenticate(allowedAuthenticators)) {
                                 BiometricManager.BIOMETRIC_SUCCESS -> {
                                 val executor = ContextCompat.getMainExecutor(this@MainActivity)
                                 val promptInfo = BiometricPrompt.PromptInfo.Builder()
                                     .setTitle("Unlock Cryptora")
                                     .setSubtitle("Authenticate to access your vault")
-                                    .setNegativeButtonText("Cancel")
+                                    .setAllowedAuthenticators(allowedAuthenticators)
                                     .build()
 
                                 val biometricPrompt = BiometricPrompt(
@@ -150,6 +163,7 @@ class MainActivity : FragmentActivity() {
                                 BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE,
                                 BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> onResult("Biometric authentication is not available")
                                 else -> onResult("Biometric authentication is currently unavailable")
+                                }
                             }
                         },
                         onBiometricToggle = appContainer::setBiometricEnabled,

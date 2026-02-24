@@ -50,8 +50,7 @@ class AuthManager(
     }
 
     fun changeMasterPassword(currentPassword: CharArray, newPassword: CharArray): String? {
-        val dbKey = runCatching { openDbKey(currentPassword) }
-            .getOrElse { return "Current master password is incorrect" }
+        val dbKey = openDbKey(currentPassword) ?: return "Current master password is incorrect"
 
         val validationError = validatePasswordStrength(newPassword)
         if (validationError != null) {

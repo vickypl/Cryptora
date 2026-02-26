@@ -88,6 +88,7 @@ class AuthManager(
             keystoreManager.decryptWithDerivedKey(passwordWrappedDbKey, passwordWrappedDbIv, derivedKey).also {
                 cachedDbKeyForSession?.fill(0)
                 cachedDbKeyForSession = it.copyOf()
+                ensureBiometricWrappedKey(it)
             }
         } catch (e: Exception) {
             Log.w(TAG, "Master key unwrap/decrypt failed", e)
@@ -113,6 +114,18 @@ class AuthManager(
         val wrappedByKeystore = secureStorage.getWrappedDbKey() ?: return false
         val wrappedByKeystoreIv = secureStorage.getWrappedDbIv() ?: return false
         return wrappedByKeystore.isNotEmpty() && wrappedByKeystoreIv.isNotEmpty()
+    }
+
+    private fun ensureBiometricWrappedKey(dbKey: ByteArray) {
+        val existingWrapped = secureStorage.getWrappedDbKey()
+        val existingIv = secureStorage.getWrappedDbIv()
+        if (existingWrapped != null && existingIv != null && existingWrapped.isNotEmpty() && existingIv.isNotEmpty()) {
+            return
+        }
+
+        runCatching { keystoreManager.wrap(dbKey) }
+            .onSuccess { (wrapped, iv) -> secureStorage.setKeystoreWrappedPayload(wrapped, iv) }
+            .onFailure { Log.w(TAG, "Unable to refresh keystore wrapped key for biometric unlock", it) }
     }
 
     fun isLockedOut(): Boolean {

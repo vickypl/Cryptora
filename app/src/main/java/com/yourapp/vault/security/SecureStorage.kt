@@ -46,6 +46,11 @@ class SecureStorage(context: Context) {
         putString("pwd_wrapped_db_key_iv", passwordWrappedDbIv.toB64())
     }
 
+    fun setKeystoreWrappedPayload(wrappedDbKey: ByteArray, wrappedDbIv: ByteArray) = prefs.edit {
+        putString("wrapped_db_key", wrappedDbKey.toB64())
+        putString("wrapped_db_key_iv", wrappedDbIv.toB64())
+    }
+
     fun setBiometricEnabled(enabled: Boolean) = prefs.edit { putBoolean("biometric_enabled", enabled) }
     fun biometricEnabled(): Boolean = prefs.getBoolean("biometric_enabled", true)
 

@@ -226,14 +226,7 @@ private fun SetupScreen(onSetup: (String) -> Result<Unit>, onUserActivity: () ->
     }
 }
 
-private val MASTER_PASSWORD_REGEX = Regex("^[A-Za-z]+@[0-9]+$")
-
-private fun validateSetupInput(master: String): String? {
-    if (!MASTER_PASSWORD_REGEX.matches(master)) {
-        return "Use a password like Example@1234"
-    }
-    return null
-}
+private fun validateSetupInput(master: String): String? = null
 
 @Composable
 private fun UnlockScreen(

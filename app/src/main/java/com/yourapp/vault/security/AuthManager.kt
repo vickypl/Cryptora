@@ -20,7 +20,8 @@ class AuthManager(
         val (passwordWrappedDbKey, passwordWrappedDbIv) = keystoreManager.encryptWithDerivedKey(dbKey, derivedMasterKey)
         val (wrappedByKeystore, wrappedByKeystoreIv) = runCatching { keystoreManager.wrap(dbKey) }
             .getOrElse {
-                throw IllegalStateException("Unable to generate biometric vault key", it)
+                Log.w(TAG, "Unable to generate biometric vault key; continuing with password unlock", it)
+                byteArrayOf() to byteArrayOf()
             }
 
         secureStorage.saveSetup(

@@ -53,8 +53,8 @@ class AuthManager(
         return success
     }
 
-    fun changeMasterPassword(currentPassword: CharArray, newPassword: CharArray): String? {
-        val dbKey = openDbKey(currentPassword) ?: return "Current master password is incorrect"
+    fun changeMasterPassword(newPassword: CharArray): String? {
+        val dbKey = openDbKey() ?: return "Please unlock with biometrics/device credential and try again"
 
         val validationError = validatePasswordStrength(newPassword)
         if (validationError != null) {
@@ -113,10 +113,10 @@ class AuthManager(
     }
 
     private fun validatePasswordStrength(password: CharArray): String? {
-        if (password.size < 12) return "New password must be at least 12 characters"
         val value = String(password)
-        if (value.none(Char::isUpperCase) || value.none(Char::isLowerCase) || value.none(Char::isDigit) || !value.any { !it.isLetterOrDigit() }) {
-            return "Use uppercase, lowercase, number, and symbol in new password"
+        val pattern = Regex("^[A-Za-z]+@[0-9]+$")
+        if (!pattern.matches(value)) {
+            return "Use format like Example@1234"
         }
         return null
     }

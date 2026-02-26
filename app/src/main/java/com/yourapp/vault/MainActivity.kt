@@ -23,7 +23,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import com.yourapp.vault.security.RootDetection
 import com.yourapp.vault.security.TamperDetection
 import com.yourapp.vault.ui.VaultApp
 import com.yourapp.vault.viewmodel.SessionViewModel
@@ -77,7 +76,7 @@ class MainActivity : FragmentActivity() {
                     }
                     VaultApp(
                         setupDone = setupDone,
-                        rooted = RootDetection.isRooted(),
+                        rooted = false,
                         unlocked = unlocked,
                         biometricEnabled = appContainer.biometricEnabled(),
                         onSetup = { master ->
@@ -175,8 +174,8 @@ class MainActivity : FragmentActivity() {
                             appContainer.setSelectedSessionLimit(limit)
                             currentSessionLimitMs = sessionLimitMsFor(limit)
                         },
-                        onChangeMasterPassword = { current, next ->
-                            appContainer.changeMasterPassword(current, next)
+                        onChangeMasterPassword = { next ->
+                            appContainer.changeMasterPassword(next)
                         },
                         onRequireLock = { sessionVm.lock() },
                         onUserActivity = { sessionVm.markActive() },

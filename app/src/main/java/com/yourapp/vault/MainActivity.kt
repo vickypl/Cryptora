@@ -78,7 +78,7 @@ class MainActivity : FragmentActivity() {
                         setupDone = setupDone,
                         rooted = false,
                         unlocked = unlocked,
-                        biometricEnabled = appContainer.biometricEnabled() && appContainer.authManager.canUseBiometricUnlock(),
+                        biometricEnabled = appContainer.biometricEnabled(),
                         onSetup = { master ->
                             runCatching {
                                 val dbKey = appContainer.authManager.createVault(master.toCharArray(), null)
@@ -104,8 +104,6 @@ class MainActivity : FragmentActivity() {
                         onBiometricUnlock = { onResult ->
                             if (hookingDetected || debuggerAttached) {
                                 onResult("Sensitive operations disabled due to security risk detected")
-                            } else if (!appContainer.authManager.canUseBiometricUnlock()) {
-                                onResult("Biometric unlock unavailable for this vault. Unlock once with password.")
                             } else {
                                 val biometricManager = BiometricManager.from(this@MainActivity)
                                 val allowedAuthenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
@@ -293,9 +291,9 @@ private fun colorSchemeFor(theme: String) = when (theme) {
         tertiary = Color(0xFF33FF99),
         background = Color(0xFF000000),
         onBackground = Color(0xFF00FF66),
-        surface = Color(0xFF050505),
+        surface = Color(0xFF000000),
         onSurface = Color(0xFF00FF66),
-        surfaceVariant = Color(0xFF0C0C0C),
+        surfaceVariant = Color(0xFF000000),
         primaryContainer = Color(0xFF003311),
         secondaryContainer = Color(0xFF00290D)
     )

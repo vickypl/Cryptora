@@ -43,12 +43,7 @@ class KeystoreManager {
             .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
             .setRandomizedEncryptionRequired(true)
-            .setUserAuthenticationRequired(true)
-            .setUserAuthenticationParameters(
-                AUTH_TIMEOUT_SECONDS,
-                KeyProperties.AUTH_DEVICE_CREDENTIAL or KeyProperties.AUTH_BIOMETRIC_STRONG
-            )
-            .setUnlockedDeviceRequired(true)
+            .setUserAuthenticationRequired(false)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             builder.setIsStrongBoxBacked(useStrongBox)
@@ -96,6 +91,5 @@ class KeystoreManager {
 
     companion object {
         private const val TAG = "KeystoreManager"
-        private const val AUTH_TIMEOUT_SECONDS = 30
     }
 }

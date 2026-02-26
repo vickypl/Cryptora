@@ -20,7 +20,7 @@ class AuthManager(
         val (wrappedByKeystore, wrappedByKeystoreIv) = runCatching { keystoreManager.wrap(dbKey) }
             .getOrElse {
                 Log.w(TAG, "Keystore wrap unavailable during setup; password unlock will still work", it)
-                byteArrayOf<Byte>() to byteArrayOf<Byte>()
+                byteArrayOf() to byteArrayOf()
             }
 
         secureStorage.saveSetup(

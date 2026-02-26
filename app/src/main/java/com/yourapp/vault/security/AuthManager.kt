@@ -10,6 +10,7 @@ class AuthManager(
 ) {
     private var failedAttempts = 0
     private var lockoutStartMs = 0L
+    private var cachedDbKeyForSession: ByteArray? = null
 
     fun createVault(masterPassword: CharArray, pin: CharArray?): ByteArray {
         val salt = KeyDerivation.randomSalt(32)
@@ -31,6 +32,8 @@ class AuthManager(
             passwordWrappedDbIv = passwordWrappedDbIv
         )
         pin?.let { secureStorage.setPinHash(KeyDerivation.derive(it, salt)) }
+        cachedDbKeyForSession?.fill(0)
+        cachedDbKeyForSession = dbKey.copyOf()
         derivedMasterKey.fill(0)
         return dbKey
     }
@@ -54,7 +57,8 @@ class AuthManager(
     }
 
     fun changeMasterPassword(newPassword: CharArray): String? {
-        val dbKey = openDbKey() ?: return "Please unlock with biometrics/device credential and try again"
+        val dbKey = openDbKey() ?: cachedDbKeyForSession?.copyOf()
+            ?: return "Unlock vault first, then try changing password"
 
         val validationError = validatePasswordStrength(newPassword)
         if (validationError != null) {
@@ -81,7 +85,10 @@ class AuthManager(
 
         val derivedKey = KeyDerivation.derive(masterPassword, salt)
         return try {
-            keystoreManager.decryptWithDerivedKey(passwordWrappedDbKey, passwordWrappedDbIv, derivedKey)
+            keystoreManager.decryptWithDerivedKey(passwordWrappedDbKey, passwordWrappedDbIv, derivedKey).also {
+                cachedDbKeyForSession?.fill(0)
+                cachedDbKeyForSession = it.copyOf()
+            }
         } catch (e: Exception) {
             Log.w(TAG, "Master key unwrap/decrypt failed", e)
             null
@@ -94,7 +101,18 @@ class AuthManager(
         val wrappedByKeystore = secureStorage.getWrappedDbKey() ?: return null
         val wrappedByKeystoreIv = secureStorage.getWrappedDbIv() ?: return null
         if (wrappedByKeystore.isEmpty() || wrappedByKeystoreIv.isEmpty()) return null
-        return runCatching { keystoreManager.unwrap(wrappedByKeystore, wrappedByKeystoreIv) }.getOrNull()
+        return runCatching { keystoreManager.unwrap(wrappedByKeystore, wrappedByKeystoreIv) }
+            .getOrNull()
+            ?.also {
+                cachedDbKeyForSession?.fill(0)
+                cachedDbKeyForSession = it.copyOf()
+            }
+    }
+
+    fun canUseBiometricUnlock(): Boolean {
+        val wrappedByKeystore = secureStorage.getWrappedDbKey() ?: return false
+        val wrappedByKeystoreIv = secureStorage.getWrappedDbIv() ?: return false
+        return wrappedByKeystore.isNotEmpty() && wrappedByKeystoreIv.isNotEmpty()
     }
 
     fun isLockedOut(): Boolean {

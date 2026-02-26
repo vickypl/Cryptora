@@ -78,7 +78,7 @@ class MainActivity : FragmentActivity() {
                         setupDone = setupDone,
                         rooted = false,
                         unlocked = unlocked,
-                        biometricEnabled = appContainer.biometricEnabled(),
+                        biometricEnabled = appContainer.biometricEnabled() && appContainer.authManager.canUseBiometricUnlock(),
                         onSetup = { master ->
                             runCatching {
                                 val dbKey = appContainer.authManager.createVault(master.toCharArray(), null)
@@ -104,11 +104,13 @@ class MainActivity : FragmentActivity() {
                         onBiometricUnlock = { onResult ->
                             if (hookingDetected || debuggerAttached) {
                                 onResult("Sensitive operations disabled due to security risk detected")
+                            } else if (!appContainer.authManager.canUseBiometricUnlock()) {
+                                onResult("Biometric unlock unavailable for this vault. Unlock once with password.")
                             } else {
                                 val biometricManager = BiometricManager.from(this@MainActivity)
-                            val allowedAuthenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
-                                BiometricManager.Authenticators.DEVICE_CREDENTIAL
-                            when (biometricManager.canAuthenticate(allowedAuthenticators)) {
+                                val allowedAuthenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                                when (biometricManager.canAuthenticate(allowedAuthenticators)) {
                                 BiometricManager.BIOMETRIC_SUCCESS -> {
                                 val executor = ContextCompat.getMainExecutor(this@MainActivity)
                                 val promptInfo = BiometricPrompt.PromptInfo.Builder()
@@ -283,5 +285,19 @@ private fun colorSchemeFor(theme: String) = when (theme) {
         secondaryContainer = Color(0xFF3A3961)
     )
 
+    "TERMINAL" -> darkColorScheme(
+        primary = Color(0xFF00FF66),
+        onPrimary = Color(0xFF001A08),
+        secondary = Color(0xFF00D154),
+        onSecondary = Color(0xFF001A08),
+        tertiary = Color(0xFF33FF99),
+        background = Color(0xFF000000),
+        onBackground = Color(0xFF00FF66),
+        surface = Color(0xFF050505),
+        onSurface = Color(0xFF00FF66),
+        surfaceVariant = Color(0xFF0C0C0C),
+        primaryContainer = Color(0xFF003311),
+        secondaryContainer = Color(0xFF00290D)
+    )
     else -> darkColorScheme()
 }

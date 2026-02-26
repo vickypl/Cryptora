@@ -860,7 +860,8 @@ private val appThemeOptions = listOf(
     ThemeOption("SLATE", "Slate Gray"),
     ThemeOption("GRAPHITE", "Graphite"),
     ThemeOption("FOREST", "Forest Night"),
-    ThemeOption("INDIGO", "Indigo")
+    ThemeOption("INDIGO", "Indigo"),
+    ThemeOption("TERMINAL", "Terminal Hacker")
 )
 
 private data class SessionLimitOption(val key: String, val label: String)

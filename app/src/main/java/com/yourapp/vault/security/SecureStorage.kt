@@ -7,6 +7,7 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
 class SecureStorage(context: Context) {
+    // EncryptedSharedPreferences is defense-in-depth only; primary protection is Keystore auth binding + SQLCipher key wrapping.
     private val prefs = EncryptedSharedPreferences.create(
         context,
         "vault_secure_prefs",
@@ -15,12 +16,19 @@ class SecureStorage(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    fun saveSetup(hashedMaster: ByteArray, salt: ByteArray, wrappedDbKey: ByteArray, iv: ByteArray) {
+    fun saveSetup(
+        salt: ByteArray,
+        wrappedDbKey: ByteArray,
+        wrappedDbIv: ByteArray,
+        passwordWrappedDbKey: ByteArray,
+        passwordWrappedDbIv: ByteArray
+    ) {
         prefs.edit {
-            putString("master_hash", hashedMaster.toB64())
             putString("salt", salt.toB64())
             putString("wrapped_db_key", wrappedDbKey.toB64())
-            putString("wrapped_db_key_iv", iv.toB64())
+            putString("wrapped_db_key_iv", wrappedDbIv.toB64())
+            putString("pwd_wrapped_db_key", passwordWrappedDbKey.toB64())
+            putString("pwd_wrapped_db_key_iv", passwordWrappedDbIv.toB64())
             putBoolean("is_setup_done", true)
         }
     }
@@ -28,10 +36,20 @@ class SecureStorage(context: Context) {
     fun isSetupDone(): Boolean = prefs.getBoolean("is_setup_done", false)
 
     fun getSalt(): ByteArray? = prefs.getString("salt", null)?.fromB64()
-    fun getMasterHash(): ByteArray? = prefs.getString("master_hash", null)?.fromB64()
-    fun setMasterHash(masterHash: ByteArray) = prefs.edit { putString("master_hash", masterHash.toB64()) }
     fun getWrappedDbKey(): ByteArray? = prefs.getString("wrapped_db_key", null)?.fromB64()
     fun getWrappedDbIv(): ByteArray? = prefs.getString("wrapped_db_key_iv", null)?.fromB64()
+    fun getPasswordWrappedDbKey(): ByteArray? = prefs.getString("pwd_wrapped_db_key", null)?.fromB64()
+    fun getPasswordWrappedDbIv(): ByteArray? = prefs.getString("pwd_wrapped_db_key_iv", null)?.fromB64()
+
+    fun setWrappedPayload(passwordWrappedDbKey: ByteArray, passwordWrappedDbIv: ByteArray) = prefs.edit {
+        putString("pwd_wrapped_db_key", passwordWrappedDbKey.toB64())
+        putString("pwd_wrapped_db_key_iv", passwordWrappedDbIv.toB64())
+    }
+
+    fun setKeystoreWrappedPayload(wrappedDbKey: ByteArray, wrappedDbIv: ByteArray) = prefs.edit {
+        putString("wrapped_db_key", wrappedDbKey.toB64())
+        putString("wrapped_db_key_iv", wrappedDbIv.toB64())
+    }
 
     fun setBiometricEnabled(enabled: Boolean) = prefs.edit { putBoolean("biometric_enabled", enabled) }
     fun biometricEnabled(): Boolean = prefs.getBoolean("biometric_enabled", true)

@@ -68,7 +68,9 @@ import com.yourapp.vault.domain.model.Credential
 import com.yourapp.vault.security.PasswordGenerator
 import com.yourapp.vault.util.SecureClipboard
 import com.yourapp.vault.viewmodel.VaultViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 @Composable
@@ -85,7 +87,7 @@ fun VaultApp(
     onThemeChange: (String) -> Unit,
     selectedSessionLimit: String,
     onSessionLimitChange: (String) -> Unit,
-    onChangeMasterPassword: (current: String, next: String) -> String?,
+    onChangeMasterPassword: (next: String) -> String?,
     onRequireLock: () -> Unit,
     onUserActivity: () -> Unit,
     lockoutMs: Long,
@@ -129,6 +131,7 @@ private fun SetupScreen(onSetup: (String) -> Result<Unit>, onUserActivity: () ->
     var master by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var creatingVault by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     Box(
         modifier = Modifier
@@ -196,10 +199,13 @@ private fun SetupScreen(onSetup: (String) -> Result<Unit>, onUserActivity: () ->
                         }
 
                         creatingVault = true
-                        val result = onSetup(master)
-                        creatingVault = false
-                        if (result.isFailure) {
-                            error = result.exceptionOrNull()?.message ?: "Unable to create vault. Please try again."
+                        scope.launch {
+                            val result = withContext(Dispatchers.Default) { onSetup(master) }
+                            creatingVault = false
+                            if (result.isFailure) {
+                                error = result.exceptionOrNull()?.message
+                                    ?: "Unable to create vault. Please verify device lock/biometric and try again."
+                            }
                         }
                     },
                     enabled = !creatingVault,
@@ -220,15 +226,7 @@ private fun SetupScreen(onSetup: (String) -> Result<Unit>, onUserActivity: () ->
     }
 }
 
-private fun validateSetupInput(master: String): String? {
-    if (master.length < 12) {
-        return "Master password must be at least 12 characters."
-    }
-    if (master.none(Char::isUpperCase) || master.none(Char::isLowerCase) || master.none(Char::isDigit) || !master.any { !it.isLetterOrDigit() }) {
-        return "Use uppercase, lowercase, number, and symbol in master password."
-    }
-    return null
-}
+private fun validateSetupInput(master: String): String? = null
 
 @Composable
 private fun UnlockScreen(
@@ -359,7 +357,7 @@ private fun VaultHome(
     onThemeChange: (String) -> Unit,
     selectedSessionLimit: String,
     onSessionLimitChange: (String) -> Unit,
-    onChangeMasterPassword: (current: String, next: String) -> String?,
+    onChangeMasterPassword: (next: String) -> String?,
     onRequireLock: () -> Unit,
     onUserActivity: () -> Unit,
     sessionRemainingMs: Long,
@@ -469,9 +467,9 @@ private fun VaultHome(
                 onUserActivity()
                 onSessionLimitChange(it)
             },
-            onChangeMasterPassword = { current, next ->
+            onChangeMasterPassword = { next ->
                 onUserActivity()
-                onChangeMasterPassword(current, next)
+                onChangeMasterPassword(next)
             },
             onDismiss = { settingsOpen = false }
         )
@@ -724,13 +722,13 @@ private fun SettingsDialog(
     onThemeSelected: (String) -> Unit,
     selectedSessionLimit: String,
     onSessionLimitSelected: (String) -> Unit,
-    onChangeMasterPassword: (current: String, next: String) -> String?,
+    onChangeMasterPassword: (next: String) -> String?,
     onDismiss: () -> Unit
 ) {
-    var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordError by remember { mutableStateOf<String?>(null) }
+    var showPasswordChangedPopup by remember { mutableStateOf(false) }
     var sessionMenuExpanded by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -801,15 +799,6 @@ private fun SettingsDialog(
 
                 Text("Change Master Password", style = MaterialTheme.typography.titleMedium)
                 OutlinedTextField(
-                    value = currentPassword,
-                    onValueChange = { currentPassword = it; passwordError = null },
-                    label = { Text("Current Master Password") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                OutlinedTextField(
                     value = newPassword,
                     onValueChange = { newPassword = it; passwordError = null },
                     label = { Text("New Master Password") },
@@ -830,15 +819,13 @@ private fun SettingsDialog(
                 Button(
                     onClick = {
                         passwordError = when {
-                            currentPassword.isBlank() -> "Current master password is required"
                             newPassword != confirmPassword -> "New password and confirm password do not match"
-                            else -> onChangeMasterPassword(currentPassword, newPassword)
+                            else -> onChangeMasterPassword(newPassword)
                         }
                         if (passwordError == null) {
-                            currentPassword = ""
                             newPassword = ""
                             confirmPassword = ""
-                            passwordError = "Successfully updated"
+                            showPasswordChangedPopup = true
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -855,6 +842,17 @@ private fun SettingsDialog(
             }
         }
     )
+
+    if (showPasswordChangedPopup) {
+        AlertDialog(
+            onDismissRequest = { showPasswordChangedPopup = false },
+            title = { Text("Success") },
+            text = { Text("Master password updated successfully") },
+            confirmButton = {
+                TextButton(onClick = { showPasswordChangedPopup = false }) { Text("OK") }
+            }
+        )
+    }
 }
 
 private data class ThemeOption(val key: String, val label: String)
@@ -864,7 +862,8 @@ private val appThemeOptions = listOf(
     ThemeOption("SLATE", "Slate Gray"),
     ThemeOption("GRAPHITE", "Graphite"),
     ThemeOption("FOREST", "Forest Night"),
-    ThemeOption("INDIGO", "Indigo")
+    ThemeOption("INDIGO", "Indigo"),
+    ThemeOption("TERMINAL", "Terminal Hacker")
 )
 
 private data class SessionLimitOption(val key: String, val label: String)

@@ -1,6 +1,7 @@
 package com.yourapp.vault
 
 import android.os.Bundle
+import android.util.Log
 import android.view.WindowManager
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
@@ -22,7 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import com.yourapp.vault.security.RootDetection
+import com.yourapp.vault.security.TamperDetection
 import com.yourapp.vault.ui.VaultApp
 import com.yourapp.vault.viewmodel.SessionViewModel
 import com.yourapp.vault.viewmodel.VaultViewModel
@@ -36,6 +37,14 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
 
         val appContainer = AppContainer(applicationContext)
+        val debuggerAttached = TamperDetection.isDebuggerAttached()
+        val hookingDetected = TamperDetection.isHookingDetected()
+        if (debuggerAttached) {
+            Log.w("MainActivity", "Debugger detected. Sensitive operations should be restricted.")
+        }
+        if (hookingDetected) {
+            Log.w("MainActivity", "Hooking framework indicators detected.")
+        }
         val sessionVm = ViewModelProvider(this)[SessionViewModel::class.java]
         var currentSessionLimitMs: Long? = sessionLimitMsFor(appContainer.selectedSessionLimit())
 
@@ -67,7 +76,7 @@ class MainActivity : FragmentActivity() {
                     }
                     VaultApp(
                         setupDone = setupDone,
-                        rooted = RootDetection.isRooted(),
+                        rooted = false,
                         unlocked = unlocked,
                         biometricEnabled = appContainer.biometricEnabled(),
                         onSetup = { master ->
@@ -80,14 +89,11 @@ class MainActivity : FragmentActivity() {
                         },
                         onUnlock = { password ->
                             runCatching {
-                                val success = !password.isNullOrBlank() &&
-                                    appContainer.authManager.verifyMasterPassword(password.toCharArray())
-                                if (!success) {
+                                if (password.isNullOrBlank()) {
                                     return@runCatching "Authentication failed"
                                 }
-
-                                val dbKey = appContainer.authManager.openDbKey()
-                                    ?: return@runCatching "Unable to access vault key"
+                                val dbKey = appContainer.authManager.openDbKey(password.toCharArray())
+                                    ?: return@runCatching "Authentication failed"
                                 vaultViewModel = VaultViewModel(appContainer.createRepository(dbKey))
                                 sessionVm.unlock()
                                 null
@@ -96,16 +102,19 @@ class MainActivity : FragmentActivity() {
                             }
                         },
                         onBiometricUnlock = { onResult ->
-                            val biometricManager = BiometricManager.from(this@MainActivity)
-                            val allowedAuthenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
-                                BiometricManager.Authenticators.BIOMETRIC_WEAK
-                            when (biometricManager.canAuthenticate(allowedAuthenticators)) {
+                            if (hookingDetected || debuggerAttached) {
+                                onResult("Sensitive operations disabled due to security risk detected")
+                            } else {
+                                val biometricManager = BiometricManager.from(this@MainActivity)
+                                val allowedAuthenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
+                                when (biometricManager.canAuthenticate(allowedAuthenticators)) {
                                 BiometricManager.BIOMETRIC_SUCCESS -> {
                                 val executor = ContextCompat.getMainExecutor(this@MainActivity)
                                 val promptInfo = BiometricPrompt.PromptInfo.Builder()
                                     .setTitle("Unlock Cryptora")
                                     .setSubtitle("Authenticate to access your vault")
-                                    .setNegativeButtonText("Cancel")
+                                    .setAllowedAuthenticators(allowedAuthenticators)
                                     .build()
 
                                 val biometricPrompt = BiometricPrompt(
@@ -150,6 +159,7 @@ class MainActivity : FragmentActivity() {
                                 BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE,
                                 BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> onResult("Biometric authentication is not available")
                                 else -> onResult("Biometric authentication is currently unavailable")
+                                }
                             }
                         },
                         onBiometricToggle = appContainer::setBiometricEnabled,
@@ -164,8 +174,8 @@ class MainActivity : FragmentActivity() {
                             appContainer.setSelectedSessionLimit(limit)
                             currentSessionLimitMs = sessionLimitMsFor(limit)
                         },
-                        onChangeMasterPassword = { current, next ->
-                            appContainer.changeMasterPassword(current, next)
+                        onChangeMasterPassword = { next ->
+                            appContainer.changeMasterPassword(next)
                         },
                         onRequireLock = { sessionVm.lock() },
                         onUserActivity = { sessionVm.markActive() },
@@ -273,5 +283,19 @@ private fun colorSchemeFor(theme: String) = when (theme) {
         secondaryContainer = Color(0xFF3A3961)
     )
 
+    "TERMINAL" -> darkColorScheme(
+        primary = Color(0xFF00FF66),
+        onPrimary = Color(0xFF001A08),
+        secondary = Color(0xFF00D154),
+        onSecondary = Color(0xFF001A08),
+        tertiary = Color(0xFF33FF99),
+        background = Color(0xFF000000),
+        onBackground = Color(0xFF00FF66),
+        surface = Color(0xFF000000),
+        onSurface = Color(0xFF00FF66),
+        surfaceVariant = Color(0xFF000000),
+        primaryContainer = Color(0xFF003311),
+        secondaryContainer = Color(0xFF00290D)
+    )
     else -> darkColorScheme()
 }

@@ -238,7 +238,16 @@ private fun UnlockScreen(
 ) {
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var attemptedBiometric by remember { mutableStateOf(false) }
 
+    LaunchedEffect(biometricEnabled, lockoutMs) {
+        if (biometricEnabled && lockoutMs == 0L && !attemptedBiometric) {
+            attemptedBiometric = true
+            onBiometricUnlock { unlockError ->
+                error = unlockError
+            }
+        }
+    }
 
     Box(
         modifier = Modifier

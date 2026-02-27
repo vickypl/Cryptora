@@ -64,9 +64,17 @@ class KeystoreManager {
     }
 
     fun wrap(data: ByteArray): Pair<ByteArray, ByteArray> {
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
-        return cipher.doFinal(data) to cipher.iv
+        return runCatching {
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
+            cipher.doFinal(data) to cipher.iv
+        }.getOrElse { firstError ->
+            Log.w(TAG, "Initial keystore wrap failed, recreating key and retrying", firstError)
+            deleteKey()
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
+            cipher.doFinal(data) to cipher.iv
+        }
     }
 
     fun unwrap(wrapped: ByteArray, iv: ByteArray): ByteArray {
@@ -87,6 +95,17 @@ class KeystoreManager {
         val keySpec = SecretKeySpec(derivedKey, "AES")
         cipher.init(Cipher.DECRYPT_MODE, keySpec, GCMParameterSpec(128, iv))
         return cipher.doFinal(ciphertext)
+    }
+
+    private fun deleteKey() {
+        runCatching {
+            val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            if (ks.containsAlias(alias)) {
+                ks.deleteEntry(alias)
+            }
+        }.onFailure {
+            Log.w(TAG, "Failed to delete keystore alias during recovery", it)
+        }
     }
 
     companion object {

@@ -4,7 +4,6 @@ import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyInfo
 import android.security.keystore.KeyProperties
-import android.security.keystore.StrongBoxUnavailableException
 import android.util.Log
 import java.security.KeyFactory
 import java.security.KeyStore
@@ -19,23 +18,43 @@ class KeystoreManager {
 
     private fun getOrCreateKey(): SecretKey {
         val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        (ks.getKey(alias, null) as? SecretKey)?.let {
-            logHardwareBacking(it)
-            return it
+
+        val existingKey = runCatching { ks.getKey(alias, null) as? SecretKey }
+            .onFailure {
+                Log.w(TAG, "Existing keystore key is not usable, recreating", it)
+                deleteKey()
+            }
+            .getOrNull()
+
+        if (existingKey != null) {
+            logHardwareBacking(existingKey)
+            return existingKey
         }
 
+        return generateKeyWithFallback()
+    }
+
+    private fun generateKeyWithFallback(): SecretKey {
         val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
-        try {
+
+        val key = runCatching {
             keyGenerator.init(buildSpec(useStrongBox = true))
-        } catch (e: StrongBoxUnavailableException) {
-            Log.w(TAG, "StrongBox unavailable; falling back to hardware-backed AndroidKeyStore", e)
+            keyGenerator.generateKey()
+        }.recoverCatching { strongBoxError ->
+            Log.w(TAG, "StrongBox generation failed; falling back", strongBoxError)
             keyGenerator.init(buildSpec(useStrongBox = false))
-        } catch (e: Exception) {
-            Log.w(TAG, "StrongBox initialization failed; falling back to hardware-backed AndroidKeyStore", e)
+            keyGenerator.generateKey()
+        }.recoverCatching { fallbackError ->
+            Log.w(TAG, "Fallback generation failed; deleting alias and retrying", fallbackError)
+            deleteKey()
             keyGenerator.init(buildSpec(useStrongBox = false))
+            keyGenerator.generateKey()
+        }.getOrElse { finalError ->
+            throw IllegalStateException("Failed to generate key", finalError)
         }
 
-        return keyGenerator.generateKey().also(::logHardwareBacking)
+        logHardwareBacking(key)
+        return key
     }
 
     private fun buildSpec(useStrongBox: Boolean): KeyGenParameterSpec {

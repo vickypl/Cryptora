@@ -99,6 +99,8 @@ class AuthManager(
     }
 
     fun openDbKey(): ByteArray? {
+        cachedDbKeyForSession?.let { return it.copyOf() }
+
         val wrappedByKeystore = secureStorage.getWrappedDbKey() ?: return null
         val wrappedByKeystoreIv = secureStorage.getWrappedDbIv() ?: return null
         if (wrappedByKeystore.isEmpty() || wrappedByKeystoreIv.isEmpty()) return null
@@ -111,6 +113,7 @@ class AuthManager(
     }
 
     fun canUseBiometricUnlock(): Boolean {
+        if (cachedDbKeyForSession != null) return true
         val wrappedByKeystore = secureStorage.getWrappedDbKey() ?: return false
         val wrappedByKeystoreIv = secureStorage.getWrappedDbIv() ?: return false
         return wrappedByKeystore.isNotEmpty() && wrappedByKeystoreIv.isNotEmpty()

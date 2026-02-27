@@ -18,6 +18,12 @@ interface CredentialDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: CredentialEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(entities: List<CredentialEntity>)
+
+    @Query("SELECT * FROM credentials ORDER BY updatedAt DESC")
+    suspend fun listAll(): List<CredentialEntity>
+
     @Delete
     suspend fun delete(entity: CredentialEntity)
 }

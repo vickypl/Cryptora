@@ -9,6 +9,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.util.UUID
 import javax.crypto.Cipher
 import javax.crypto.Mac
 import javax.crypto.spec.GCMParameterSpec
@@ -74,7 +75,7 @@ class VaultBackupManager(private val context: Context) {
     }
 
     private fun decryptPayload(payload: String, masterPassword: CharArray): String {
-        val json = JSONObject(payload)
+        val json = JSONObject(payload.trim())
         val salt = json.getString("salt").fromB64()
         val iv = json.getString("iv").fromB64()
         val ciphertext = json.getString("ciphertext").fromB64()
@@ -121,26 +122,41 @@ class VaultBackupManager(private val context: Context) {
     }
 
     private fun jsonToCredentials(value: String): List<Credential> {
-        val root = JSONObject(value)
-        val array = root.optJSONArray("credentials") ?: JSONArray()
+        val trimmed = value.trim()
+        val array = if (trimmed.startsWith("[")) {
+            JSONArray(trimmed)
+        } else {
+            JSONObject(trimmed).optJSONArray("credentials") ?: JSONArray()
+        }
+
         return buildList {
             for (index in 0 until array.length()) {
                 val item = array.getJSONObject(index)
                 add(
                     Credential(
-                        id = item.getString("id"),
-                        title = item.getString("title"),
-                        username = item.getString("username"),
-                        password = item.getString("password"),
+                        id = item.optString("id").ifBlank { UUID.randomUUID().toString() },
+                        title = item.firstNonBlank("title", "site", "name").ifBlank { "Untitled" },
+                        username = item.firstNonBlank("username", "email", "user"),
+                        password = item.firstNonBlank("password", "pass"),
                         url = item.optString("url", null),
                         notes = item.optString("notes", null),
-                        category = item.getString("category"),
+                        category = item.optString("category").ifBlank { "General" },
                         createdAt = item.optLong("createdAt", System.currentTimeMillis()),
                         updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
                     )
                 )
             }
         }
+    }
+
+    private fun JSONObject.firstNonBlank(vararg keys: String): String {
+        keys.forEach { key ->
+            val value = optString(key)
+            if (value.isNotBlank()) {
+                return value
+            }
+        }
+        return ""
     }
 
     private fun ByteArray.toB64(): String = Base64.encodeToString(this, Base64.NO_WRAP)

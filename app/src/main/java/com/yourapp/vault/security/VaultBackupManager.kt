@@ -12,7 +12,9 @@ import java.security.MessageDigest
 import java.util.UUID
 import javax.crypto.Cipher
 import javax.crypto.Mac
+import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 
 class VaultBackupManager(private val context: Context) {
@@ -51,7 +53,7 @@ class VaultBackupManager(private val context: Context) {
 
     private fun encryptPayload(plainJson: String, masterPassword: CharArray): String {
         val salt = KeyDerivation.randomSalt(32)
-        val keyMaterial = KeyDerivation.derive(masterPassword, salt)
+        val keyMaterial = deriveWithIterations(masterPassword, salt, CURRENT_ITERATIONS)
         val encryptionKey = keyMaterial.copyOfRange(0, 16) + keyMaterial.copyOfRange(16, 32)
         val hmacKey = MessageDigest.getInstance("SHA-256").digest(keyMaterial + "hmac".toByteArray(StandardCharsets.UTF_8))
         keyMaterial.fill(0)
@@ -68,6 +70,7 @@ class VaultBackupManager(private val context: Context) {
         return JSONObject()
             .put("version", 1)
             .put("salt", salt.toB64())
+            .put("kdfIterations", CURRENT_ITERATIONS)
             .put("iv", iv.toB64())
             .put("ciphertext", ciphertext.toB64())
             .put("hmac", hmac.toB64())
@@ -81,24 +84,43 @@ class VaultBackupManager(private val context: Context) {
         val ciphertext = json.getString("ciphertext").fromB64()
         val expectedHmac = json.getString("hmac").fromB64()
 
-        val keyMaterial = KeyDerivation.derive(masterPassword, salt)
-        val encryptionKey = keyMaterial.copyOfRange(0, 16) + keyMaterial.copyOfRange(16, 32)
-        val hmacKey = MessageDigest.getInstance("SHA-256").digest(keyMaterial + "hmac".toByteArray(StandardCharsets.UTF_8))
-        keyMaterial.fill(0)
-
-        val mac = Mac.getInstance("HmacSHA256")
-        mac.init(SecretKeySpec(hmacKey, "HmacSHA256"))
-        val actualHmac = mac.doFinal(iv + ciphertext)
-        if (!MessageDigest.isEqual(expectedHmac, actualHmac)) {
-            error("Invalid Master Password or Corrupted Vault File.")
+        val configuredIterations = json.optInt("kdfIterations", CURRENT_ITERATIONS)
+        val attempts = linkedSetOf(configuredIterations, CURRENT_ITERATIONS).apply {
+            LEGACY_ITERATIONS.forEach { add(it) }
         }
 
+        attempts.forEach { iterations ->
+            val keyMaterial = deriveWithIterations(masterPassword.copyOf(), salt, iterations)
+            val encryptionKey = keyMaterial.copyOfRange(0, 16) + keyMaterial.copyOfRange(16, 32)
+            val hmacKey = MessageDigest.getInstance("SHA-256").digest(keyMaterial + "hmac".toByteArray(StandardCharsets.UTF_8))
+            keyMaterial.fill(0)
+
+            val mac = Mac.getInstance("HmacSHA256")
+            mac.init(SecretKeySpec(hmacKey, "HmacSHA256"))
+            val actualHmac = mac.doFinal(iv + ciphertext)
+            if (!MessageDigest.isEqual(expectedHmac, actualHmac)) {
+                return@forEach
+            }
+
+            try {
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(encryptionKey, "AES"), GCMParameterSpec(128, iv))
+                return String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8)
+            } catch (_: Exception) {
+                return@forEach
+            }
+        }
+
+        error("Invalid Master Password or Corrupted Vault File.")
+    }
+
+    private fun deriveWithIterations(password: CharArray, salt: ByteArray, iterations: Int): ByteArray {
+        val spec = PBEKeySpec(password, salt, iterations, PBKDF2_KEY_LENGTH)
         return try {
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(encryptionKey, "AES"), GCMParameterSpec(128, iv))
-            String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8)
-        } catch (_: Exception) {
-            error("Invalid Master Password or Corrupted Vault File.")
+            SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
+        } finally {
+            spec.clearPassword()
+            password.fill('\u0000')
         }
     }
 
@@ -159,7 +181,6 @@ class VaultBackupManager(private val context: Context) {
         return ""
     }
 
-
     private fun findVaultFile(directory: DocumentFile): DocumentFile? {
         directory.findFile(VAULT_FILE_NAME)?.let { return it }
         return directory.listFiles().firstOrNull { file ->
@@ -174,5 +195,8 @@ class VaultBackupManager(private val context: Context) {
 
     companion object {
         const val VAULT_FILE_NAME = "vault.enc"
+        private const val PBKDF2_KEY_LENGTH = 256
+        private const val CURRENT_ITERATIONS = 300_000
+        private val LEGACY_ITERATIONS = intArrayOf(210_000)
     }
 }

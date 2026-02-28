@@ -12,6 +12,10 @@ class VaultRepository(private val dao: CredentialDao) {
 
     suspend fun upsert(credential: Credential) = dao.upsert(credential.toEntity())
 
+    suspend fun upsertAll(credentials: List<Credential>) = dao.upsertAll(credentials.map { it.toEntity() })
+
+    suspend fun listAllCredentials(): List<Credential> = dao.listAll().map { it.toDomain() }
+
     suspend fun getCredential(id: String): Credential? = dao.getById(id)?.toDomain()
 
     suspend fun delete(credential: Credential) = dao.delete(credential.toEntity())

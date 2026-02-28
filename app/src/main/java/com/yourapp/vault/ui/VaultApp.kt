@@ -1,5 +1,8 @@
 package com.yourapp.vault.ui
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -79,7 +82,8 @@ fun VaultApp(
     rooted: Boolean,
     unlocked: Boolean,
     biometricEnabled: Boolean,
-    onSetup: (master: String) -> Result<Unit>,
+    onSetup: (master: String, vaultDirectory: Uri, restoreExisting: Boolean) -> Result<Unit>,
+    onHasExistingVault: (vaultDirectory: Uri) -> Boolean,
     onUnlock: (password: String?) -> String?,
     onBiometricUnlock: (onResult: (String?) -> Unit) -> Unit,
     onBiometricToggle: (Boolean) -> Unit,
@@ -100,7 +104,7 @@ fun VaultApp(
         label = "vault-navigation"
     ) { (isSetupDone, isUnlocked, vm) ->
         when {
-            !isSetupDone -> SetupScreen(onSetup, onUserActivity)
+            !isSetupDone -> SetupScreen(onSetup, onHasExistingVault, onUserActivity)
             !isUnlocked -> UnlockScreen(
                 onUnlock = onUnlock,
                 onBiometricUnlock = onBiometricUnlock,
@@ -127,11 +131,23 @@ fun VaultApp(
 }
 
 @Composable
-private fun SetupScreen(onSetup: (String) -> Result<Unit>, onUserActivity: () -> Unit) {
+private fun SetupScreen(
+    onSetup: (String, Uri, Boolean) -> Result<Unit>,
+    onHasExistingVault: (Uri) -> Boolean,
+    onUserActivity: () -> Unit
+) {
+    var selectedDirectory by remember { mutableStateOf<Uri?>(null) }
+    var restoreMode by remember { mutableStateOf(false) }
     var master by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var creatingVault by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val directoryPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        selectedDirectory = uri
+        restoreMode = onHasExistingVault(uri)
+        error = null
+    }
 
     Box(
         modifier = Modifier
@@ -155,18 +171,43 @@ private fun SetupScreen(onSetup: (String) -> Result<Unit>, onUserActivity: () ->
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "Create Your Vault",
+                    text = if (restoreMode) "Restore Existing Vault" else "Create Your Vault",
                     style = MaterialTheme.typography.headlineSmall,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Text(
-                    text = "Use a strong master password to protect your offline vault.",
+                    text = if (restoreMode) {
+                        "Existing Vault Found. Enter your Master Password to unlock."
+                    } else {
+                        "Select a vault directory, then use a strong master password to protect your offline vault."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                Button(
+                    onClick = {
+                        onUserActivity()
+                        directoryPicker.launch(selectedDirectory)
+                    },
+                    enabled = !creatingVault,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text(if (selectedDirectory == null) "Select Vault Directory" else "Change Vault Directory")
+                }
+
+                selectedDirectory?.let {
+                    Text(
+                        text = "Selected: $it",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
                 OutlinedTextField(
                     value = master,
                     onValueChange = {
@@ -192,6 +233,11 @@ private fun SetupScreen(onSetup: (String) -> Result<Unit>, onUserActivity: () ->
                 Button(
                     onClick = {
                         onUserActivity()
+                        val selected = selectedDirectory
+                        if (selected == null) {
+                            error = "Select a vault directory first"
+                            return@Button
+                        }
                         val validationError = validateSetupInput(master)
                         if (validationError != null) {
                             error = validationError
@@ -200,11 +246,10 @@ private fun SetupScreen(onSetup: (String) -> Result<Unit>, onUserActivity: () ->
 
                         creatingVault = true
                         scope.launch {
-                            val result = withContext(Dispatchers.Default) { onSetup(master) }
+                            val result = withContext(Dispatchers.Default) { onSetup(master, selected, restoreMode) }
                             creatingVault = false
                             if (result.isFailure) {
-                                error = result.exceptionOrNull()?.message
-                                    ?: "Unable to create vault. Please verify device lock/biometric and try again."
+                                error = result.exceptionOrNull()?.message ?: "Unable to process vault. Please try again."
                             }
                         }
                     },
@@ -218,7 +263,7 @@ private fun SetupScreen(onSetup: (String) -> Result<Unit>, onUserActivity: () ->
                             modifier = Modifier.padding(vertical = 4.dp).size(20.dp)
                         )
                     } else {
-                        Text("Create Vault", modifier = Modifier.padding(vertical = 4.dp))
+                        Text(if (restoreMode) "Restore Vault" else "Create Vault", modifier = Modifier.padding(vertical = 4.dp))
                     }
                 }
             }

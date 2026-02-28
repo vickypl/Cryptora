@@ -60,6 +60,9 @@ class SecureStorage(context: Context) {
     fun setSessionLimit(limit: String) = prefs.edit { putString("session_limit", limit) }
     fun getSessionLimit(): String = prefs.getString("session_limit", "5m") ?: "5m"
 
+    fun setVaultDirectoryUri(uri: String) = prefs.edit { putString("vault_directory_uri", uri) }
+    fun getVaultDirectoryUri(): String? = prefs.getString("vault_directory_uri", null)
+
     fun setPinHash(pinHash: ByteArray?) = prefs.edit {
         if (pinHash == null) remove("pin_hash") else putString("pin_hash", pinHash.toB64())
     }

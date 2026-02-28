@@ -1,5 +1,6 @@
 package com.yourapp.vault
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
@@ -29,6 +30,7 @@ import com.yourapp.vault.viewmodel.SessionViewModel
 import com.yourapp.vault.viewmodel.VaultViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,13 +81,39 @@ class MainActivity : FragmentActivity() {
                         rooted = false,
                         unlocked = unlocked,
                         biometricEnabled = appContainer.biometricEnabled(),
-                        onSetup = { master ->
+                        onSetup = { master, vaultDirectory, restoreExisting ->
                             runCatching {
+                                contentResolver.takePersistableUriPermission(
+                                    vaultDirectory,
+                                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                                )
+                                appContainer.persistVaultDirectory(vaultDirectory)
+
                                 val dbKey = appContainer.authManager.createVault(master.toCharArray(), null)
-                                vaultViewModel = VaultViewModel(appContainer.createRepository(dbKey))
+                                val repository = appContainer.createRepository(dbKey)
+
+                                if (restoreExisting) {
+                                    val restoredCredentials = appContainer.restoreVaultFromExternal(vaultDirectory, master.toCharArray())
+                                        .getOrElse { throw IllegalStateException("Invalid Master Password or Corrupted Vault File.") }
+                                    runBlocking { repository.upsertAll(restoredCredentials) }
+                                } else {
+                                    appContainer.backupVaultToExternal(vaultDirectory, emptyList(), master.toCharArray())
+                                        .getOrElse { throw IllegalStateException("Unable to initialize vault backup file") }
+                                }
+
+                                vaultViewModel = VaultViewModel(repository)
                                 setupDone = true
                                 sessionVm.unlock()
                             }
+                        },
+                        onHasExistingVault = { vaultDirectory ->
+                            runCatching {
+                                contentResolver.takePersistableUriPermission(
+                                    vaultDirectory,
+                                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                                )
+                            }
+                            appContainer.hasExternalVault(vaultDirectory)
                         },
                         onUnlock = { password ->
                             runCatching {
@@ -94,7 +122,12 @@ class MainActivity : FragmentActivity() {
                                 }
                                 val dbKey = appContainer.authManager.openDbKey(password.toCharArray())
                                     ?: return@runCatching "Authentication failed"
-                                vaultViewModel = VaultViewModel(appContainer.createRepository(dbKey))
+                                val repository = appContainer.createRepository(dbKey)
+                                appContainer.selectedVaultDirectory()?.let { uri ->
+                                    val snapshot = runBlocking { repository.listAllCredentials() }
+                                    appContainer.backupVaultToExternal(uri, snapshot, password.toCharArray())
+                                }
+                                vaultViewModel = VaultViewModel(repository)
                                 sessionVm.unlock()
                                 null
                             }.getOrElse {

@@ -18,7 +18,7 @@ import javax.crypto.spec.SecretKeySpec
 class VaultBackupManager(private val context: Context) {
     fun vaultExists(directoryUri: Uri): Boolean {
         val dir = DocumentFile.fromTreeUri(context, directoryUri) ?: return false
-        return dir.findFile(VAULT_FILE_NAME)?.exists() == true
+        return findVaultFile(dir)?.exists() == true
     }
 
     fun writeVault(directoryUri: Uri, credentials: List<Credential>, masterPassword: CharArray): Result<Unit> {
@@ -26,7 +26,7 @@ class VaultBackupManager(private val context: Context) {
             val dir = DocumentFile.fromTreeUri(context, directoryUri) ?: error("Unable to access selected directory")
             val payload = encryptPayload(credentialsToJson(credentials), masterPassword)
 
-            val file = dir.findFile(VAULT_FILE_NAME)
+            val file = findVaultFile(dir)
                 ?: dir.createFile("application/octet-stream", VAULT_FILE_NAME)
                 ?: error("Unable to create vault file")
 
@@ -40,7 +40,7 @@ class VaultBackupManager(private val context: Context) {
     fun restoreVault(directoryUri: Uri, masterPassword: CharArray): Result<List<Credential>> {
         return runCatching {
             val dir = DocumentFile.fromTreeUri(context, directoryUri) ?: error("Unable to access selected directory")
-            val file = dir.findFile(VAULT_FILE_NAME) ?: error("Vault file not found")
+            val file = findVaultFile(dir) ?: error("Vault file not found")
             val content = context.contentResolver.openInputStream(file.uri)?.use { stream ->
                 stream.readBytes().toString(StandardCharsets.UTF_8)
             } ?: error("Unable to read vault file")
@@ -157,6 +157,16 @@ class VaultBackupManager(private val context: Context) {
             }
         }
         return ""
+    }
+
+
+    private fun findVaultFile(directory: DocumentFile): DocumentFile? {
+        directory.findFile(VAULT_FILE_NAME)?.let { return it }
+        return directory.listFiles().firstOrNull { file ->
+            val name = file.name ?: return@firstOrNull false
+            name.equals(VAULT_FILE_NAME, ignoreCase = true) ||
+                name.startsWith("vault", ignoreCase = true) && name.endsWith(".enc", ignoreCase = true)
+        }
     }
 
     private fun ByteArray.toB64(): String = Base64.encodeToString(this, Base64.NO_WRAP)

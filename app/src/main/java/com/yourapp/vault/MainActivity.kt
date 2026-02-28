@@ -89,10 +89,11 @@ class MainActivity : FragmentActivity() {
                                 )
                                 appContainer.persistVaultDirectory(vaultDirectory)
 
+                                val hasExistingVault = appContainer.hasExternalVault(vaultDirectory)
                                 val dbKey = appContainer.authManager.createVault(master.toCharArray(), null)
                                 val repository = appContainer.createRepository(dbKey)
 
-                                if (restoreExisting) {
+                                if (restoreExisting || hasExistingVault) {
                                     val restoredCredentials = appContainer.restoreVaultFromExternal(vaultDirectory, master.toCharArray())
                                         .getOrElse { throw IllegalStateException("Invalid Master Password or Corrupted Vault File.") }
                                     runBlocking { repository.upsertAll(restoredCredentials) }

@@ -89,15 +89,22 @@ class MainActivity : FragmentActivity() {
                                 )
                                 appContainer.persistVaultDirectory(vaultDirectory)
 
-                                val hasExistingVault = appContainer.hasExternalVault(vaultDirectory)
+                                val shouldRestore = restoreExisting || appContainer.hasExternalVault(vaultDirectory)
+                                val restoredCredentials = if (shouldRestore) {
+                                    appContainer.restoreVaultFromExternal(vaultDirectory, master.toCharArray())
+                                        .getOrElse { throw IllegalStateException("Invalid Master Password or Corrupted Vault File.") }
+                                } else {
+                                    emptyList()
+                                }
+
                                 val dbKey = appContainer.authManager.createVault(master.toCharArray(), null)
                                 val repository = appContainer.createRepository(dbKey)
 
-                                if (restoreExisting || hasExistingVault) {
-                                    val restoredCredentials = appContainer.restoreVaultFromExternal(vaultDirectory, master.toCharArray())
-                                        .getOrElse { throw IllegalStateException("Invalid Master Password or Corrupted Vault File.") }
+                                if (restoredCredentials.isNotEmpty()) {
                                     runBlocking { repository.upsertAll(restoredCredentials) }
-                                } else {
+                                }
+
+                                if (!shouldRestore) {
                                     appContainer.backupVaultToExternal(vaultDirectory, emptyList(), master.toCharArray())
                                         .getOrElse { throw IllegalStateException("Unable to initialize vault backup file") }
                                 }
@@ -126,7 +133,10 @@ class MainActivity : FragmentActivity() {
                                 val repository = appContainer.createRepository(dbKey)
                                 appContainer.selectedVaultDirectory()?.let { uri ->
                                     val snapshot = runBlocking { repository.listAllCredentials() }
-                                    appContainer.backupVaultToExternal(uri, snapshot, password.toCharArray())
+                                    val hasExternalVault = appContainer.hasExternalVault(uri)
+                                    if (snapshot.isNotEmpty() || !hasExternalVault) {
+                                        appContainer.backupVaultToExternal(uri, snapshot, password.toCharArray())
+                                    }
                                 }
                                 vaultViewModel = VaultViewModel(repository)
                                 sessionVm.unlock()

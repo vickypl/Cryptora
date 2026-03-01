@@ -183,11 +183,24 @@ class VaultBackupManager(private val context: Context) {
 
     private fun findVaultFile(directory: DocumentFile): DocumentFile? {
         directory.findFile(VAULT_FILE_NAME)?.let { return it }
-        return directory.listFiles().firstOrNull { file ->
+
+        val files = directory.listFiles()
+        files.firstOrNull { file ->
             val name = file.name ?: return@firstOrNull false
-            name.equals(VAULT_FILE_NAME, ignoreCase = true) ||
-                name.startsWith("vault", ignoreCase = true) && name.endsWith(".enc", ignoreCase = true)
-        }
+            name.equals(VAULT_FILE_NAME, ignoreCase = true)
+        }?.let { return it }
+
+        files.firstOrNull { file ->
+            val name = file.name ?: return@firstOrNull false
+            name.endsWith(".enc", ignoreCase = true)
+        }?.let { return it }
+
+        files.firstOrNull { file ->
+            val name = file.name ?: return@firstOrNull false
+            name.startsWith("vault", ignoreCase = true)
+        }?.let { return it }
+
+        return files.firstOrNull { it.isFile }
     }
 
     private fun ByteArray.toB64(): String = Base64.encodeToString(this, Base64.NO_WRAP)

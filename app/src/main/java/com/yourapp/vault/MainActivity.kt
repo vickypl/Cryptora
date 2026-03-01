@@ -104,6 +104,10 @@ class MainActivity : FragmentActivity() {
                                     runBlocking { repository.upsertAll(restoredCredentials) }
                                 }
 
+                                if (!shouldRestore && !appContainer.hasExternalVault(vaultDirectory)) {
+                                    appContainer.backupVaultToExternal(vaultDirectory, emptyList(), master.toCharArray())
+                                        .getOrElse { throw IllegalStateException("Unable to initialize vault backup file") }
+                                }
 
                                 vaultViewModel = VaultViewModel(repository)
                                 setupDone = true
@@ -129,7 +133,8 @@ class MainActivity : FragmentActivity() {
                                 val repository = appContainer.createRepository(dbKey)
                                 appContainer.selectedVaultDirectory()?.let { uri ->
                                     val snapshot = runBlocking { repository.listAllCredentials() }
-                                    if (snapshot.isNotEmpty()) {
+                                    val hasExternalVault = appContainer.hasExternalVault(uri)
+                                    if (snapshot.isNotEmpty() || !hasExternalVault) {
                                         appContainer.backupVaultToExternal(uri, snapshot, password.toCharArray())
                                     }
                                 }

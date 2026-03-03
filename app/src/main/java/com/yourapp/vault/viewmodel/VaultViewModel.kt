@@ -90,6 +90,7 @@ class VaultViewModel(
                 manager.writeVault(directory, snapshot, password)
                     .getOrElse { throw it }
             }
+            Log.d(TAG, "syncBackup success")
         } catch (e: Exception) {
             Log.e(TAG, "syncBackup failed", e)
         } finally {

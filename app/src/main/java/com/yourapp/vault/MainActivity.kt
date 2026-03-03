@@ -95,6 +95,8 @@ class MainActivity : FragmentActivity() {
                                     val restoredCredentials = appContainer.restoreVaultFromExternal(vaultDirectory, master.toCharArray())
                                         .getOrElse { throw IllegalStateException("Invalid Master Password or Corrupted Vault File.") }
                                     runBlocking { repository.upsertAll(restoredCredentials) }
+                                    appContainer.backupVaultToExternal(vaultDirectory, restoredCredentials, master.toCharArray())
+                                        .getOrElse { throw IllegalStateException("Restore completed, but backup target could not be activated") }
                                 } else {
                                     appContainer.backupVaultToExternal(vaultDirectory, emptyList(), master.toCharArray())
                                         .getOrElse { throw IllegalStateException("Unable to initialize vault backup file") }

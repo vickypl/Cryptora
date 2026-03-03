@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -41,8 +44,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -61,8 +64,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -815,15 +820,10 @@ private fun SettingsDialog(
                 HorizontalDivider()
 
                 Text("Theme", style = MaterialTheme.typography.titleMedium)
-                appThemeOptions.forEach { option ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().clickable { onThemeSelected(option.key) },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(selected = selectedTheme == option.key, onClick = { onThemeSelected(option.key) })
-                        Text(option.label)
-                    }
-                }
+                ThemePickerSection(
+                    currentTheme = selectedTheme,
+                    onThemeSelected = onThemeSelected
+                )
 
                 HorizontalDivider()
 
@@ -922,14 +922,56 @@ private fun SettingsDialog(
 
 private data class ThemeOption(val key: String, val label: String)
 
-private val appThemeOptions = listOf(
-    ThemeOption("MIDNIGHT", "Midnight Blue"),
-    ThemeOption("SLATE", "Slate Gray"),
-    ThemeOption("GRAPHITE", "Graphite"),
-    ThemeOption("FOREST", "Forest Night"),
-    ThemeOption("INDIGO", "Indigo"),
-    ThemeOption("TERMINAL", "Terminal Hacker")
-)
+
+@Composable
+private fun ThemePickerSection(
+    currentTheme: String,
+    onThemeSelected: (String) -> Unit
+) {
+    val themes = listOf(
+        ThemeOption("BLOOD_VAULT", "🩸 Blood Vault") to Pair(Color(0xFF0D0000), Color(0xFFB71C1C)),
+        ThemeOption("MATRIX", "👾 Matrix") to Pair(Color(0xFF000000), Color(0xFF00FF41)),
+        ThemeOption("DEEP_OCEAN", "🌊 Deep Ocean") to Pair(Color(0xFF000A14), Color(0xFF00BCD4)),
+        ThemeOption("NUCLEAR", "☢️ Nuclear") to Pair(Color(0xFF0A0C00), Color(0xFFCCFF00)),
+        ThemeOption("INFERNO", "🔥 Inferno") to Pair(Color(0xFF0D0300), Color(0xFFFF6600))
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        themes.forEach { (theme, colors) ->
+            val (bgColor, accentColor) = colors
+            val isSelected = currentTheme == theme.key
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(bgColor, RoundedCornerShape(12.dp))
+                    .border(
+                        width = if (isSelected) 2.dp else 0.5.dp,
+                        color = if (isSelected) accentColor else accentColor.copy(alpha = 0.3f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .clickable { onThemeSelected(theme.key) }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = theme.label,
+                    color = accentColor,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Selected",
+                        tint = accentColor
+                    )
+                }
+            }
+        }
+    }
+}
 
 private data class SessionLimitOption(val key: String, val label: String)
 

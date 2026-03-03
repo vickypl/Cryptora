@@ -147,6 +147,6 @@ class VaultBackupManager(private val context: Context) {
     private fun String.fromB64(): ByteArray = Base64.decode(this, Base64.NO_WRAP)
 
     companion object {
-        const val VAULT_FILE_NAME = "vault.enc"
+        const val VAULT_FILE_NAME = "cryptora_backup.enc"
     }
 }

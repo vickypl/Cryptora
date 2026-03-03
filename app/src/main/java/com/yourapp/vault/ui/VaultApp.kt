@@ -145,7 +145,6 @@ private fun SetupScreen(
     val directoryPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         selectedDirectory = uri
-        restoreMode = onHasExistingVault(uri)
         error = null
     }
 
@@ -178,7 +177,7 @@ private fun SetupScreen(
                 )
                 Text(
                     text = if (restoreMode) {
-                        "Existing Vault Found. Enter your Master Password to unlock."
+                        "Restore credentials from your existing encrypted backup file."
                     } else {
                         "Select a vault directory, then use a strong master password to protect your offline vault."
                     },
@@ -187,6 +186,23 @@ private fun SetupScreen(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Restore from backup")
+                    Switch(
+                        checked = restoreMode,
+                        onCheckedChange = {
+                            onUserActivity()
+                            restoreMode = it
+                            error = null
+                        },
+                        enabled = !creatingVault
+                    )
+                }
 
                 Button(
                     onClick = {
@@ -241,6 +257,10 @@ private fun SetupScreen(
                         val validationError = validateSetupInput(master)
                         if (validationError != null) {
                             error = validationError
+                            return@Button
+                        }
+                        if (restoreMode && !onHasExistingVault(selected)) {
+                            error = "Backup file not found in selected directory"
                             return@Button
                         }
 

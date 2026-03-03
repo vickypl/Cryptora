@@ -87,7 +87,6 @@ class MainActivity : FragmentActivity() {
                                     vaultDirectory,
                                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                                 )
-                                appContainer.persistVaultDirectory(vaultDirectory)
 
                                 val dbKey = appContainer.authManager.createVault(master.toCharArray(), null)
                                 val repository = appContainer.createRepository(dbKey)
@@ -96,14 +95,22 @@ class MainActivity : FragmentActivity() {
                                     val restoredCredentials = appContainer.restoreVaultFromExternal(vaultDirectory, master.toCharArray())
                                         .getOrElse { throw IllegalStateException("Invalid Master Password or Corrupted Vault File.") }
                                     runBlocking { repository.upsertAll(restoredCredentials) }
+                                    appContainer.backupVaultToExternal(vaultDirectory, restoredCredentials, master.toCharArray())
+                                        .getOrElse { throw IllegalStateException("Restore completed, but backup target could not be activated") }
                                 } else {
                                     appContainer.backupVaultToExternal(vaultDirectory, emptyList(), master.toCharArray())
                                         .getOrElse { throw IllegalStateException("Unable to initialize vault backup file") }
                                 }
 
-                                vaultViewModel = VaultViewModel(repository)
+                                appContainer.persistVaultDirectory(vaultDirectory)
+                                vaultViewModel = VaultViewModel(
+                                    repository = repository,
+                                    backupManager = appContainer.backupManager(),
+                                    backupDirectoryProvider = appContainer::selectedVaultDirectory,
+                                    masterPasswordProvider = sessionVm::getMasterPassword
+                                )
                                 setupDone = true
-                                sessionVm.unlock()
+                                sessionVm.unlockWithPassword(master)
                             }
                         },
                         onHasExistingVault = { vaultDirectory ->
@@ -127,8 +134,13 @@ class MainActivity : FragmentActivity() {
                                     val snapshot = runBlocking { repository.listAllCredentials() }
                                     appContainer.backupVaultToExternal(uri, snapshot, password.toCharArray())
                                 }
-                                vaultViewModel = VaultViewModel(repository)
-                                sessionVm.unlock()
+                                vaultViewModel = VaultViewModel(
+                                    repository = repository,
+                                    backupManager = appContainer.backupManager(),
+                                    backupDirectoryProvider = appContainer::selectedVaultDirectory,
+                                    masterPasswordProvider = sessionVm::getMasterPassword
+                                )
+                                sessionVm.unlockWithPassword(password)
                                 null
                             }.getOrElse {
                                 "Unable to unlock vault. Please try again."
@@ -161,7 +173,12 @@ class MainActivity : FragmentActivity() {
                                                 return
                                             }
                                             runCatching {
-                                                vaultViewModel = VaultViewModel(appContainer.createRepository(dbKey))
+                                                vaultViewModel = VaultViewModel(
+                                                    repository = appContainer.createRepository(dbKey),
+                                                    backupManager = appContainer.backupManager(),
+                                                    backupDirectoryProvider = appContainer::selectedVaultDirectory,
+                                                    masterPasswordProvider = sessionVm::getMasterPassword
+                                                )
                                                 sessionVm.unlock()
                                                 onResult(null)
                                             }.getOrElse {
@@ -208,7 +225,18 @@ class MainActivity : FragmentActivity() {
                             currentSessionLimitMs = sessionLimitMsFor(limit)
                         },
                         onChangeMasterPassword = { next ->
-                            appContainer.changeMasterPassword(next)
+                            val updateError = appContainer.changeMasterPassword(next)
+                            if (updateError != null) {
+                                updateError
+                            } else {
+                                sessionVm.updateMasterPassword(next)
+                                val reEncryptResult = runBlocking {
+                                    vaultViewModel?.reEncryptBackupWithNewMasterPassword(next) ?: Result.success(Unit)
+                                }
+                                reEncryptResult.exceptionOrNull()?.let {
+                                    "Master password changed, but backup could not be re-encrypted. Please trigger a backup sync."
+                                }
+                            }
                         },
                         onRequireLock = { sessionVm.lock() },
                         onUserActivity = { sessionVm.markActive() },

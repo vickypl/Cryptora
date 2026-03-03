@@ -223,7 +223,18 @@ class MainActivity : FragmentActivity() {
                             currentSessionLimitMs = sessionLimitMsFor(limit)
                         },
                         onChangeMasterPassword = { next ->
-                            appContainer.changeMasterPassword(next)
+                            val updateError = appContainer.changeMasterPassword(next)
+                            if (updateError != null) {
+                                updateError
+                            } else {
+                                sessionVm.updateMasterPassword(next)
+                                val reEncryptResult = runBlocking {
+                                    vaultViewModel?.reEncryptBackupWithNewMasterPassword(next) ?: Result.success(Unit)
+                                }
+                                reEncryptResult.exceptionOrNull()?.let {
+                                    "Master password changed, but backup could not be re-encrypted. Please trigger a backup sync."
+                                }
+                            }
                         },
                         onRequireLock = { sessionVm.lock() },
                         onUserActivity = { sessionVm.markActive() },

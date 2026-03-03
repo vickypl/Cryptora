@@ -55,6 +55,25 @@ class VaultViewModel(
         }
     }
 
+
+    suspend fun reEncryptBackupWithNewMasterPassword(newPassword: String): Result<Unit> {
+        val manager = backupManager ?: return Result.failure(IllegalStateException("Backup manager unavailable"))
+        val directory = backupDirectoryProvider?.invoke()
+            ?: return Result.failure(IllegalStateException("Backup directory is not configured"))
+        return runCatching {
+            val snapshot = repository.listAllCredentials()
+            val passwordChars = newPassword.toCharArray()
+            try {
+                kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    manager.writeVault(directory, snapshot, passwordChars)
+                        .getOrElse { throw it }
+                }
+            } finally {
+                passwordChars.fill('\u0000')
+            }
+        }
+    }
+
     private suspend fun syncBackup() {
         val manager = backupManager ?: return
         val directory = backupDirectoryProvider?.invoke() ?: run {

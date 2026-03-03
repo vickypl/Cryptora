@@ -35,6 +35,10 @@ class SessionViewModel : ViewModel() {
         masterPassword = password.toCharArray()
     }
 
+    fun updateMasterPassword(newPassword: String) {
+        setMasterPassword(newPassword)
+    }
+
     fun getMasterPassword(): CharArray? = masterPassword?.copyOf()
 
     fun markActive() {

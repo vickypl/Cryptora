@@ -101,7 +101,13 @@ class MainActivity : FragmentActivity() {
                                         .getOrElse { throw IllegalStateException("Unable to initialize vault backup file") }
                                 }
 
-                                vaultViewModel = VaultViewModel(repository)
+                                sessionVm.setMasterPassword(master)
+                                vaultViewModel = VaultViewModel(
+                                    repository = repository,
+                                    backupManager = appContainer.backupManager(),
+                                    backupDirectoryProvider = appContainer::selectedVaultDirectory,
+                                    masterPasswordProvider = sessionVm::getMasterPassword
+                                )
                                 setupDone = true
                                 sessionVm.unlock()
                             }
@@ -127,7 +133,13 @@ class MainActivity : FragmentActivity() {
                                     val snapshot = runBlocking { repository.listAllCredentials() }
                                     appContainer.backupVaultToExternal(uri, snapshot, password.toCharArray())
                                 }
-                                vaultViewModel = VaultViewModel(repository)
+                                sessionVm.setMasterPassword(password)
+                                vaultViewModel = VaultViewModel(
+                                    repository = repository,
+                                    backupManager = appContainer.backupManager(),
+                                    backupDirectoryProvider = appContainer::selectedVaultDirectory,
+                                    masterPasswordProvider = sessionVm::getMasterPassword
+                                )
                                 sessionVm.unlock()
                                 null
                             }.getOrElse {
@@ -161,7 +173,12 @@ class MainActivity : FragmentActivity() {
                                                 return
                                             }
                                             runCatching {
-                                                vaultViewModel = VaultViewModel(appContainer.createRepository(dbKey))
+                                                vaultViewModel = VaultViewModel(
+                                                    repository = appContainer.createRepository(dbKey),
+                                                    backupManager = appContainer.backupManager(),
+                                                    backupDirectoryProvider = appContainer::selectedVaultDirectory,
+                                                    masterPasswordProvider = sessionVm::getMasterPassword
+                                                )
                                                 sessionVm.unlock()
                                                 onResult(null)
                                             }.getOrElse {

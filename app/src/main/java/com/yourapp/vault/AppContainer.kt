@@ -43,4 +43,6 @@ class AppContainer(private val context: Context) {
 
     fun backupVaultToExternal(uri: Uri, credentials: List<Credential>, masterPassword: CharArray) =
         backupManager.writeVault(uri, credentials, masterPassword)
+
+    fun backupManager(): VaultBackupManager = backupManager
 }

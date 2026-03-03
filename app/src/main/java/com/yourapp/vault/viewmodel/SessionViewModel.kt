@@ -10,6 +10,7 @@ class SessionViewModel : ViewModel() {
 
     private var lastActiveAt: Long = 0L
     private var unlockedAt: Long = 0L
+    private var masterPassword: CharArray? = null
 
     fun unlock() {
         _isUnlocked.value = true
@@ -20,7 +21,16 @@ class SessionViewModel : ViewModel() {
     fun lock() {
         _isUnlocked.value = false
         unlockedAt = 0L
+        masterPassword?.fill('\u0000')
+        masterPassword = null
     }
+
+    fun setMasterPassword(password: String) {
+        masterPassword?.fill('\u0000')
+        masterPassword = password.toCharArray()
+    }
+
+    fun getMasterPassword(): CharArray? = masterPassword?.copyOf()
 
     fun markActive() {
         lastActiveAt = System.currentTimeMillis()

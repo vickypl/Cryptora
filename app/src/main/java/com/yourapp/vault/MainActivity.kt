@@ -87,7 +87,6 @@ class MainActivity : FragmentActivity() {
                                     vaultDirectory,
                                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                                 )
-                                appContainer.persistVaultDirectory(vaultDirectory)
 
                                 val dbKey = appContainer.authManager.createVault(master.toCharArray(), null)
                                 val repository = appContainer.createRepository(dbKey)
@@ -101,7 +100,7 @@ class MainActivity : FragmentActivity() {
                                         .getOrElse { throw IllegalStateException("Unable to initialize vault backup file") }
                                 }
 
-                                sessionVm.setMasterPassword(master)
+                                appContainer.persistVaultDirectory(vaultDirectory)
                                 vaultViewModel = VaultViewModel(
                                     repository = repository,
                                     backupManager = appContainer.backupManager(),
@@ -109,7 +108,7 @@ class MainActivity : FragmentActivity() {
                                     masterPasswordProvider = sessionVm::getMasterPassword
                                 )
                                 setupDone = true
-                                sessionVm.unlock()
+                                sessionVm.unlockWithPassword(master)
                             }
                         },
                         onHasExistingVault = { vaultDirectory ->
@@ -133,14 +132,13 @@ class MainActivity : FragmentActivity() {
                                     val snapshot = runBlocking { repository.listAllCredentials() }
                                     appContainer.backupVaultToExternal(uri, snapshot, password.toCharArray())
                                 }
-                                sessionVm.setMasterPassword(password)
                                 vaultViewModel = VaultViewModel(
                                     repository = repository,
                                     backupManager = appContainer.backupManager(),
                                     backupDirectoryProvider = appContainer::selectedVaultDirectory,
                                     masterPasswordProvider = sessionVm::getMasterPassword
                                 )
-                                sessionVm.unlock()
+                                sessionVm.unlockWithPassword(password)
                                 null
                             }.getOrElse {
                                 "Unable to unlock vault. Please try again."

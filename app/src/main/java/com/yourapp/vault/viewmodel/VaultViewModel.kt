@@ -1,5 +1,6 @@
 package com.yourapp.vault.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yourapp.vault.security.VaultBackupManager
@@ -56,12 +57,29 @@ class VaultViewModel(
 
     private suspend fun syncBackup() {
         val manager = backupManager ?: return
-        val directory = backupDirectoryProvider?.invoke() ?: return
-        val password = masterPasswordProvider?.invoke() ?: return
-        val snapshot = repository.listAllCredentials()
-        kotlinx.coroutines.withContext(Dispatchers.IO) {
-            manager.writeVault(directory, snapshot, password)
+        val directory = backupDirectoryProvider?.invoke() ?: run {
+            Log.w(TAG, "syncBackup skipped: no backup directory configured")
+            return
         }
-        password.fill('\u0000')
+        val password = masterPasswordProvider?.invoke() ?: run {
+            Log.w(TAG, "syncBackup skipped: no master password in active session")
+            return
+        }
+        try {
+            val snapshot = repository.listAllCredentials()
+            kotlinx.coroutines.withContext(Dispatchers.IO) {
+                manager.writeVault(directory, snapshot, password)
+                    .getOrElse { throw it }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "syncBackup failed", e)
+        } finally {
+            password.fill('\u0000')
+        }
     }
+
+    companion object {
+        private const val TAG = "VaultViewModel"
+    }
+
 }

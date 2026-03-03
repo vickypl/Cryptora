@@ -18,6 +18,11 @@ class SessionViewModel : ViewModel() {
         markActive()
     }
 
+    fun unlockWithPassword(password: String) {
+        setMasterPassword(password)
+        unlock()
+    }
+
     fun lock() {
         _isUnlocked.value = false
         unlockedAt = 0L

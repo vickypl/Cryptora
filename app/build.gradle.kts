@@ -87,6 +87,7 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
 
     implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-paging:2.6.1")
 
     implementation("androidx.paging:paging-runtime-ktx:3.3.2")
     implementation("androidx.paging:paging-compose:3.3.2")

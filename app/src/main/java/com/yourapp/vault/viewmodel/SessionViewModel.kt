@@ -1,8 +1,13 @@
 package com.yourapp.vault.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 class SessionViewModel : ViewModel() {
     private val _isUnlocked = MutableStateFlow(false)
@@ -11,6 +16,7 @@ class SessionViewModel : ViewModel() {
     private var lastActiveAt: Long = 0L
     private var unlockedAt: Long = 0L
     private var masterPassword: CharArray? = null
+    private var lockJob: Job? = null
 
     fun unlock() {
         _isUnlocked.value = true
@@ -26,6 +32,7 @@ class SessionViewModel : ViewModel() {
     fun lock() {
         _isUnlocked.value = false
         unlockedAt = 0L
+        lockJob?.cancel()
         masterPassword?.fill('\u0000')
         masterPassword = null
     }
@@ -45,9 +52,15 @@ class SessionViewModel : ViewModel() {
         lastActiveAt = System.currentTimeMillis()
     }
 
-    fun lockIfInactive(timeoutMs: Long = 180_000L) {
-        if (_isUnlocked.value && System.currentTimeMillis() - lastActiveAt > timeoutMs) {
-            lock()
+    fun resetInactivityTimer(timeoutMs: Long = 180_000L) {
+        if (!_isUnlocked.value) return
+        markActive()
+        lockJob?.cancel()
+        lockJob = viewModelScope.launch(Dispatchers.Default) {
+            delay(timeoutMs)
+            if (_isUnlocked.value && System.currentTimeMillis() - lastActiveAt >= timeoutMs) {
+                lock()
+            }
         }
     }
 

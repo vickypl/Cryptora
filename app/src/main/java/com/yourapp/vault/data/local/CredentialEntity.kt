@@ -1,10 +1,14 @@
 package com.yourapp.vault.data.local
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.yourapp.vault.domain.model.Credential
 
-@Entity(tableName = "credentials")
+@Entity(
+    tableName = "credentials",
+    indices = [Index(value = ["title"]), Index(value = ["username"])]
+)
 data class CredentialEntity(
     @PrimaryKey val id: String,
     val title: String,

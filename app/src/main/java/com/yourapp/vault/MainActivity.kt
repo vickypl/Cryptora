@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
 import androidx.fragment.app.FragmentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.biometric.BiometricManager
@@ -47,6 +48,17 @@ class MainActivity : FragmentActivity() {
             Log.w("MainActivity", "Hooking framework indicators detected.")
         }
         val sessionVm = ViewModelProvider(this)[SessionViewModel::class.java]
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (sessionVm.isUnlocked.value) {
+                    sessionVm.lock()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                    isEnabled = true
+                }
+            }
+        })
         var currentSessionLimitMs: Long? = sessionLimitMsFor(appContainer.selectedSessionLimit())
 
         setContent {
@@ -62,7 +74,7 @@ class MainActivity : FragmentActivity() {
 
                     LaunchedEffect(unlocked) {
                         if (unlocked) {
-                            sessionVm.markActive()
+                            sessionVm.resetInactivityTimer()
                         }
                     }
 
@@ -110,6 +122,7 @@ class MainActivity : FragmentActivity() {
                                 )
                                 setupDone = true
                                 sessionVm.unlockWithPassword(master)
+                                sessionVm.resetInactivityTimer()
                             }
                         },
                         onHasExistingVault = { vaultDirectory ->
@@ -140,6 +153,7 @@ class MainActivity : FragmentActivity() {
                                     masterPasswordProvider = sessionVm::getMasterPassword
                                 )
                                 sessionVm.unlockWithPassword(password)
+                                sessionVm.resetInactivityTimer()
                                 null
                             }.getOrElse {
                                 "Unable to unlock vault. Please try again."
@@ -179,6 +193,7 @@ class MainActivity : FragmentActivity() {
                                                     masterPasswordProvider = sessionVm::getMasterPassword
                                                 )
                                                 sessionVm.unlock()
+                                                sessionVm.resetInactivityTimer()
                                                 onResult(null)
                                             }.getOrElse {
                                                 onResult("Unable to unlock vault. Please try again.")
@@ -238,7 +253,7 @@ class MainActivity : FragmentActivity() {
                             }
                         },
                         onRequireLock = { sessionVm.lock() },
-                        onUserActivity = { sessionVm.markActive() },
+                        onUserActivity = { sessionVm.resetInactivityTimer() },
                         lockoutMs = appContainer.authManager.lockoutRemainingMs(),
                         sessionRemainingMs = sessionRemainingMs,
                         vaultViewModel = vaultViewModel
@@ -250,7 +265,6 @@ class MainActivity : FragmentActivity() {
         lifecycleScope.launch {
             while (true) {
                 delay(1_000)
-                sessionVm.lockIfInactive()
                 currentSessionLimitMs?.let { sessionVm.lockIfSessionExpired(it) }
             }
         }

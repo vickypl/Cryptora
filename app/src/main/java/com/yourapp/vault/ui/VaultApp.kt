@@ -71,6 +71,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.paging.LoadState
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import com.yourapp.vault.R
 import com.yourapp.vault.domain.model.Credential
 import com.yourapp.vault.ui.components.CryptoraCard
@@ -435,7 +438,7 @@ private fun VaultHome(
         return
     }
 
-    val list by viewModel.filtered.collectAsStateWithLifecycleCompat()
+    val credentials = viewModel.credentials.collectAsLazyPagingItems()
     val query by viewModel.query.collectAsStateWithLifecycleCompat()
     var adding by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<Credential?>(null) }
@@ -481,14 +484,41 @@ private fun VaultHome(
                 modifier = Modifier.fillMaxWidth()
             )
             LazyColumn(contentPadding = PaddingValues(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(list, key = { it.id }) { item ->
-                    CryptoraCard(onClick = { onUserActivity(); selected = item }) {
-                        Column(Modifier.padding(12.dp)) {
-                            Text(item.title)
-                            Text(item.username)
-                            Text(item.category)
+                items(
+                    count = credentials.itemCount,
+                    key = credentials.itemKey { it.id }
+                ) { index ->
+                    val item = credentials[index]
+                    if (item != null) {
+                        CryptoraCard(onClick = { onUserActivity(); selected = item }) {
+                            Column(Modifier.padding(12.dp)) {
+                                Text(item.title)
+                                Text(item.username)
+                                Text(item.category)
+                            }
                         }
                     }
+                }
+
+                when (credentials.loadState.append) {
+                    is LoadState.Loading -> item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+
+                    is LoadState.Error -> item {
+                        Text(
+                            text = "Failed to load more",
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+
+                    else -> Unit
                 }
             }
         }

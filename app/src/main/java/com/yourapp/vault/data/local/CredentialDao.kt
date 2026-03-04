@@ -1,16 +1,25 @@
 package com.yourapp.vault.data.local
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CredentialDao {
-    @Query("SELECT * FROM credentials ORDER BY updatedAt DESC")
-    fun observeAll(): Flow<List<CredentialEntity>>
+    @Query("SELECT * FROM credentials ORDER BY title ASC")
+    fun getCredentialsPaged(): PagingSource<Int, CredentialEntity>
+
+    @Query(
+        """
+        SELECT * FROM credentials
+        WHERE title LIKE :query OR username LIKE :query
+        ORDER BY title ASC
+        """
+    )
+    fun searchCredentialsPaged(query: String): PagingSource<Int, CredentialEntity>
 
     @Query("SELECT * FROM credentials WHERE id = :id")
     suspend fun getById(id: String): CredentialEntity?

@@ -33,9 +33,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
@@ -48,6 +46,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -73,9 +73,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.yourapp.vault.R
 import com.yourapp.vault.domain.model.Credential
+import com.yourapp.vault.ui.components.CryptoraCard
+import com.yourapp.vault.ui.components.CryptoraTextField
 import com.yourapp.vault.security.PasswordGenerator
 import com.yourapp.vault.util.SecureClipboard
 import com.yourapp.vault.viewmodel.VaultViewModel
+import com.yourapp.vault.ui.theme.extraColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -160,12 +163,11 @@ private fun SetupScreen(
             .imePadding()
             .padding(horizontal = 24.dp)
     ) {
-        ElevatedCard(
+        CryptoraCard(
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth()
-                .widthIn(max = 460.dp),
-            shape = RoundedCornerShape(28.dp)
+                .widthIn(max = 460.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -205,7 +207,8 @@ private fun SetupScreen(
                             restoreMode = it
                             error = null
                         },
-                        enabled = !creatingVault
+                        enabled = !creatingVault,
+                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.extraColors.switchChecked, uncheckedThumbColor = MaterialTheme.extraColors.switchUnchecked)
                     )
                 }
 
@@ -215,8 +218,7 @@ private fun SetupScreen(
                         directoryPicker.launch(selectedDirectory)
                     },
                     enabled = !creatingVault,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(if (selectedDirectory == null) "Select Vault Directory" else "Change Vault Directory")
                 }
@@ -229,14 +231,14 @@ private fun SetupScreen(
                     )
                 }
 
-                OutlinedTextField(
+                CryptoraTextField(
                     value = master,
                     onValueChange = {
                         onUserActivity()
                         master = it
                         if (error != null) error = null
                     },
-                    label = { Text("Master Password") },
+                    label = "Master Password",
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -279,8 +281,7 @@ private fun SetupScreen(
                         }
                     },
                     enabled = !creatingVault,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     if (creatingVault) {
                         CircularProgressIndicator(
@@ -335,12 +336,11 @@ private fun UnlockScreen(
                 .alpha(0.08f)
         )
 
-        ElevatedCard(
+        CryptoraCard(
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth()
-                .widthIn(max = 460.dp),
-            shape = RoundedCornerShape(28.dp)
+                .widthIn(max = 460.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -369,15 +369,14 @@ private fun UnlockScreen(
                     )
                 }
 
-                OutlinedTextField(
+                CryptoraTextField(
                     value = password,
                     onValueChange = { onUserActivity(); password = it },
-                    label = { Text("Master Password") },
+                    label = "Master Password",
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     enabled = lockoutMs == 0L,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
 
                 if (biometricEnabled) {
@@ -389,8 +388,7 @@ private fun UnlockScreen(
                                 error = unlockError
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp)
+                        modifier = Modifier.fillMaxWidth()
                     ) { Text("Unlock with Biometrics") }
                 }
 
@@ -400,8 +398,7 @@ private fun UnlockScreen(
                         onUserActivity()
                         error = onUnlock(password.ifBlank { null })
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) { Text("Unlock") }
 
                 error?.let {
@@ -450,8 +447,8 @@ private fun VaultHome(
     val secureClipboard = remember(context) { SecureClipboard(context) }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbar) },
-        floatingActionButton = { FloatingActionButton(onClick = { onUserActivity(); adding = true }) { Text("+") } }
+        snackbarHost = { SnackbarHost(hostState = snackbar) { data -> Snackbar(snackbarData = data, containerColor = MaterialTheme.extraColors.snackbarBackground, contentColor = MaterialTheme.extraColors.snackbarText) } },
+        floatingActionButton = { FloatingActionButton(onClick = { onUserActivity(); adding = true }, containerColor = MaterialTheme.extraColors.fabBackground, contentColor = MaterialTheme.extraColors.fabIcon) { Text("+") } }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
@@ -485,7 +482,7 @@ private fun VaultHome(
             )
             LazyColumn(contentPadding = PaddingValues(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(list, key = { it.id }) { item ->
-                    Card(modifier = Modifier.fillMaxWidth().clickable { onUserActivity(); selected = item }) {
+                    CryptoraCard(onClick = { onUserActivity(); selected = item }) {
                         Column(Modifier.padding(12.dp)) {
                             Text(item.title)
                             Text(item.username)
@@ -614,8 +611,7 @@ private fun AddCredentialDialog(
                             notes = notes.trim().ifBlank { null }
                         )
                     )
-                },
-                shape = RoundedCornerShape(14.dp)
+                }
             ) { Text(if (isEditing) "Update" else "Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
@@ -631,63 +627,56 @@ private fun AddCredentialDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                OutlinedTextField(
+                CryptoraTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Title") },
+                    label = "Title",
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
+                CryptoraTextField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text("Login / Email") },
+                    label = "Login / Email",
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
+                CryptoraTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("Password") },
+                    label = "Password",
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
                 FilledTonalButton(
                     onClick = {
                         password = PasswordGenerator.generate(16, upper = true, lower = true, digits = true, symbols = true)
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Generate Strong Password")
                 }
-                OutlinedTextField(
+                CryptoraTextField(
                     value = category,
                     onValueChange = { category = it },
-                    label = { Text("Type / Category") },
+                    label = "Type / Category",
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
+                CryptoraTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("URL (optional)") },
+                    label = "URL (optional)",
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
+                CryptoraTextField(
                     value = notes,
                     onValueChange = { notes = it },
-                    label = { Text("Notes (optional)") },
+                    label = "Notes (optional)",
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3,
-                    maxLines = 5,
-                    shape = RoundedCornerShape(14.dp)
+                    maxLines = 5
                 )
             }
         }
@@ -814,7 +803,7 @@ private fun SettingsDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Biometric Authentication")
-                    Switch(checked = biometricEnabled, onCheckedChange = onBiometricToggle)
+                    Switch(checked = biometricEnabled, onCheckedChange = onBiometricToggle, colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.extraColors.switchChecked, uncheckedThumbColor = MaterialTheme.extraColors.switchUnchecked))
                 }
 
                 HorizontalDivider()
@@ -840,8 +829,7 @@ private fun SettingsDialog(
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sessionMenuExpanded) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor(),
-                        shape = RoundedCornerShape(12.dp)
+                            .menuAnchor()
                     )
                     DropdownMenu(
                         expanded = sessionMenuExpanded,
@@ -863,23 +851,21 @@ private fun SettingsDialog(
                 HorizontalDivider()
 
                 Text("Change Master Password", style = MaterialTheme.typography.titleMedium)
-                OutlinedTextField(
+                CryptoraTextField(
                     value = newPassword,
                     onValueChange = { newPassword = it; passwordError = null },
-                    label = { Text("New Master Password") },
+                    label = "New Master Password",
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
+                CryptoraTextField(
                     value = confirmPassword,
                     onValueChange = { confirmPassword = it; passwordError = null },
-                    label = { Text("Confirm New Master Password") },
+                    label = "Confirm New Master Password",
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier.fillMaxWidth()
                 )
                 Button(
                     onClick = {
@@ -893,8 +879,7 @@ private fun SettingsDialog(
                             showPasswordChangedPopup = true
                         }
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) { Text("Update Master Password") }
 
                 passwordError?.let {
@@ -933,7 +918,9 @@ private fun ThemePickerSection(
         ThemeOption("MATRIX", "👾 Matrix") to Pair(Color(0xFF000000), Color(0xFF00FF41)),
         ThemeOption("DEEP_OCEAN", "🌊 Deep Ocean") to Pair(Color(0xFF000A14), Color(0xFF00BCD4)),
         ThemeOption("NUCLEAR", "☢️ Nuclear") to Pair(Color(0xFF0A0C00), Color(0xFFCCFF00)),
-        ThemeOption("INFERNO", "🔥 Inferno") to Pair(Color(0xFF0D0300), Color(0xFFFF6600))
+        ThemeOption("INFERNO", "🔥 Inferno") to Pair(Color(0xFF0D0300), Color(0xFFFF6600)),
+        ThemeOption("CHROME_PUNK", "🤖 Chrome Punk") to Pair(Color(0xFF050608), Color(0xFFB0BEC5)),
+        ThemeOption("SAKURA_NOIR", "🌸 Sakura Noir") to Pair(Color(0xFF0A0008), Color(0xFFFF80AB))
     )
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -947,8 +934,7 @@ private fun ThemePickerSection(
                     .background(bgColor, RoundedCornerShape(12.dp))
                     .border(
                         width = if (isSelected) 2.dp else 0.5.dp,
-                        color = if (isSelected) accentColor else accentColor.copy(alpha = 0.3f),
-                        shape = RoundedCornerShape(12.dp)
+                        color = if (isSelected) accentColor else accentColor.copy(alpha = 0.3f)
                     )
                     .clickable { onThemeSelected(theme.key) }
                     .padding(horizontal = 16.dp, vertical = 14.dp),

@@ -55,7 +55,7 @@ class SecureStorage(context: Context) {
     fun biometricEnabled(): Boolean = prefs.getBoolean("biometric_enabled", true)
 
     fun setTheme(theme: String) = prefs.edit { putString("app_theme", theme) }
-    fun getTheme(): String = prefs.getString("app_theme", "MIDNIGHT") ?: "MIDNIGHT"
+    fun getTheme(): String = prefs.getString("app_theme", "MATRIX") ?: "MATRIX"
 
     fun setSessionLimit(limit: String) = prefs.edit { putString("session_limit", limit) }
     fun getSessionLimit(): String = prefs.getString("session_limit", "5m") ?: "5m"

@@ -3,16 +3,26 @@ package com.yourapp.vault.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.yourapp.vault.security.VaultBackupManager
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.map
+import com.yourapp.vault.data.local.toDomain
 import com.yourapp.vault.data.repository.VaultRepository
 import com.yourapp.vault.domain.model.Credential
+import com.yourapp.vault.security.VaultBackupManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
+import androidx.paging.cachedIn
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class VaultViewModel(
     private val repository: VaultRepository,
@@ -20,22 +30,27 @@ class VaultViewModel(
     private val backupDirectoryProvider: (() -> android.net.Uri?)? = null,
     private val masterPasswordProvider: (() -> CharArray?)? = null
 ) : ViewModel() {
-    val credentials: StateFlow<List<Credential>> = repository.observeCredentials()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
     private val _query = MutableStateFlow("")
-    val query: StateFlow<String> = _query
+    val query: StateFlow<String> = _query.asStateFlow()
 
-    val filtered: StateFlow<List<Credential>> = combine(credentials, _query) { list, query ->
-        val q = query.trim().lowercase()
-        if (q.isBlank()) list else list.filter {
-            it.title.lowercase().contains(q) ||
-                it.username.lowercase().contains(q) ||
-                it.category.lowercase().contains(q) ||
-                (it.url?.lowercase()?.contains(q) == true) ||
-                (it.notes?.lowercase()?.contains(q) == true)
+    val credentials: Flow<PagingData<Credential>> = _query
+        .debounce(300L)
+        .distinctUntilChanged()
+        .flatMapLatest { query ->
+            Pager(
+                config = PagingConfig(
+                    pageSize = 30,
+                    prefetchDistance = 10,
+                    enablePlaceholders = false
+                ),
+                pagingSourceFactory = {
+                    if (query.isBlank()) repository.getCredentialsPaged()
+                    else repository.searchCredentialsPaged("%${query.trim()}%")
+                }
+            ).flow
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        .map { pagingData -> pagingData.map { it.toDomain() } }
+        .cachedIn(viewModelScope)
 
     fun setQuery(value: String) {
         _query.value = value
@@ -64,7 +79,7 @@ class VaultViewModel(
             val snapshot = repository.listAllCredentials()
             val passwordChars = newPassword.toCharArray()
             try {
-                kotlinx.coroutines.withContext(Dispatchers.IO) {
+                withContext(Dispatchers.IO) {
                     manager.writeVault(directory, snapshot, passwordChars)
                         .getOrElse { throw it }
                 }
@@ -74,7 +89,7 @@ class VaultViewModel(
         }
     }
 
-    private suspend fun syncBackup() {
+    private fun syncBackup() {
         val manager = backupManager ?: return
         val directory = backupDirectoryProvider?.invoke() ?: run {
             Log.w(TAG, "syncBackup skipped: no backup directory configured")
@@ -84,17 +99,17 @@ class VaultViewModel(
             Log.w(TAG, "syncBackup skipped: no master password in active session")
             return
         }
-        try {
-            val snapshot = repository.listAllCredentials()
-            kotlinx.coroutines.withContext(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val snapshot = repository.listAllCredentials()
                 manager.writeVault(directory, snapshot, password)
                     .getOrElse { throw it }
+                Log.d(TAG, "syncBackup success")
+            } catch (e: Exception) {
+                Log.e(TAG, "syncBackup failed", e)
+            } finally {
+                password.fill('\u0000')
             }
-            Log.d(TAG, "syncBackup success")
-        } catch (e: Exception) {
-            Log.e(TAG, "syncBackup failed", e)
-        } finally {
-            password.fill('\u0000')
         }
     }
 

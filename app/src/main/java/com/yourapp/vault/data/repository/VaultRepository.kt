@@ -1,14 +1,16 @@
 package com.yourapp.vault.data.repository
 
+import androidx.paging.PagingSource
 import com.yourapp.vault.data.local.CredentialDao
+import com.yourapp.vault.data.local.CredentialEntity
 import com.yourapp.vault.data.local.toDomain
 import com.yourapp.vault.data.local.toEntity
 import com.yourapp.vault.domain.model.Credential
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 
 class VaultRepository(private val dao: CredentialDao) {
-    fun observeCredentials(): Flow<List<Credential>> = dao.observeAll().map { list -> list.map { it.toDomain() } }
+    fun getCredentialsPaged(): PagingSource<Int, CredentialEntity> = dao.getCredentialsPaged()
+
+    fun searchCredentialsPaged(query: String): PagingSource<Int, CredentialEntity> = dao.searchCredentialsPaged(query)
 
     suspend fun upsert(credential: Credential) = dao.upsert(credential.toEntity())
 

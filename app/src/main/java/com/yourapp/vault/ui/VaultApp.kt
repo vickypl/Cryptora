@@ -76,6 +76,9 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.yourapp.vault.R
 import com.yourapp.vault.domain.model.Credential
+import com.yourapp.vault.domain.model.CredentialCategory
+import com.yourapp.vault.ui.components.CategoryDropdown
+import com.yourapp.vault.ui.components.CategoryFields
 import com.yourapp.vault.ui.components.CryptoraCard
 import com.yourapp.vault.ui.components.CryptoraTextField
 import com.yourapp.vault.security.PasswordGenerator
@@ -85,7 +88,6 @@ import com.yourapp.vault.ui.theme.extraColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.UUID
 
 @Composable
 fun VaultApp(
@@ -492,9 +494,9 @@ private fun VaultHome(
                     if (item != null) {
                         CryptoraCard(onClick = { onUserActivity(); selected = item }) {
                             Column(Modifier.padding(12.dp)) {
-                                Text(item.title)
-                                Text(item.username)
-                                Text(item.category)
+                                Text(item.displayTitle())
+                                item.displaySubtitle()?.let { Text(it) }
+                                Text(CredentialCategory.fromStored(item.category).name)
                             }
                         }
                     }
@@ -587,15 +589,10 @@ private fun VaultHome(
                 viewModel.delete(item)
                 selected = null
             },
-            onCopyPassword = {
+            onCopyField = { label, value ->
                 onUserActivity()
-                secureClipboard.copyPassword(item.password)
-                scope.launch { snackbar.showSnackbar("Password copied and will clear in 60s") }
-            },
-            onCopyUsername = {
-                onUserActivity()
-                secureClipboard.copyUsernameOrEmail(item.username)
-                scope.launch { snackbar.showSnackbar("Username/email copied and will clear in 60s") }
+                secureClipboard.copyField(label, value)
+                scope.launch { snackbar.showSnackbar("$label copied and will clear in 60s") }
             }
         )
     }
@@ -607,15 +604,10 @@ private fun AddCredentialDialog(
     onDismiss: () -> Unit,
     onSave: (Credential) -> Unit
 ) {
-    var title by remember { mutableStateOf(initialCredential?.title.orEmpty()) }
-    var username by remember { mutableStateOf(initialCredential?.username.orEmpty()) }
-    var password by remember { mutableStateOf(initialCredential?.password.orEmpty()) }
-    var category by remember { mutableStateOf(initialCredential?.category ?: "General") }
-    var url by remember { mutableStateOf(initialCredential?.url.orEmpty()) }
-    var notes by remember { mutableStateOf(initialCredential?.notes.orEmpty()) }
-
-    val canSave = title.isNotBlank() && username.isNotBlank() && password.isNotBlank()
+    var formState by remember(initialCredential) { mutableStateOf(CredentialFormState.fromCredential(initialCredential)) }
     val isEditing = initialCredential != null
+    val context = LocalContext.current
+    val secureClipboard = remember(context) { SecureClipboard(context) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -627,21 +619,8 @@ private fun AddCredentialDialog(
         },
         confirmButton = {
             Button(
-                enabled = canSave,
-                onClick = {
-                    onSave(
-                        Credential(
-                            id = initialCredential?.id ?: UUID.randomUUID().toString(),
-                            createdAt = initialCredential?.createdAt ?: System.currentTimeMillis(),
-                            title = title.trim(),
-                            username = username.trim(),
-                            password = password,
-                            category = category.trim().ifBlank { "General" },
-                            url = url.trim().ifBlank { null },
-                            notes = notes.trim().ifBlank { null }
-                        )
-                    )
-                }
+                enabled = formState.isValid(),
+                onClick = { onSave(formState.toCredential(initialCredential)) }
             ) { Text(if (isEditing) "Update" else "Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
@@ -652,61 +631,19 @@ private fun AddCredentialDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = if (isEditing) "Update your login details." else "Store login details securely in your vault.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                CategoryDropdown(
+                    selected = formState.category,
+                    onCategorySelected = { next ->
+                        formState = CredentialFormState(category = next)
+                    }
                 )
-                CryptoraTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = "Title",
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                CryptoraTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = "Login / Email",
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                CryptoraTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = "Password",
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                FilledTonalButton(
-                    onClick = {
-                        password = PasswordGenerator.generate(16, upper = true, lower = true, digits = true, symbols = true)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Generate Strong Password")
-                }
-                CryptoraTextField(
-                    value = category,
-                    onValueChange = { category = it },
-                    label = "Type / Category",
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                CryptoraTextField(
-                    value = url,
-                    onValueChange = { url = it },
-                    label = "URL (optional)",
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                CryptoraTextField(
-                    value = notes,
-                    onValueChange = { notes = it },
-                    label = "Notes (optional)",
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                    maxLines = 5
+                CategoryFields(
+                    category = formState.category,
+                    state = formState,
+                    onStateChange = { formState = it },
+                    onCopy = { label, value ->
+                        if (value.isNotBlank()) secureClipboard.copyField(label, value)
+                    }
                 )
             }
         }
@@ -719,17 +656,17 @@ private fun CredentialDetailDialog(
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onCopyPassword: () -> Unit,
-    onCopyUsername: () -> Unit
+    onCopyField: (String, String) -> Unit
 ) {
-    var showPassword by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    val category = CredentialCategory.fromStored(credential.category)
+    val state = CredentialFormState.fromCredential(credential)
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = credential.title,
+                text = credential.displayTitle(),
                 style = MaterialTheme.typography.headlineSmall
             )
         },
@@ -751,35 +688,16 @@ private fun CredentialDetailDialog(
         },
         dismissButton = {},
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                DetailLineWithCopy(
-                    label = "Login",
-                    value = credential.username,
-                    onCopy = onCopyUsername
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                CategoryFields(
+                    category = category,
+                    state = state,
+                    onStateChange = {},
+                    onCopy = { label, value -> onCopyField(label, value) }
                 )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Password", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(if (showPassword) credential.password else "*******", style = MaterialTheme.typography.bodyLarge)
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        TextButton(onClick = { showPassword = !showPassword }) { Text(if (showPassword) "Hide" else "View") }
-                        TextButton(onClick = onCopyPassword) { Text("Copy") }
-                    }
-                }
-
-                credential.url?.takeIf { it.isNotBlank() }?.let {
-                    Text("URL: $it", style = MaterialTheme.typography.bodyMedium)
-                }
-                credential.notes?.takeIf { it.isNotBlank() }?.let {
-                    Text("Notes: $it", style = MaterialTheme.typography.bodyMedium)
-                }
-                Text("Type: ${credential.category}", style = MaterialTheme.typography.bodyMedium)
             }
         }
     )
@@ -1007,17 +925,18 @@ private fun formatRemainingTime(ms: Long): String {
 }
 
 
-@Composable
-private fun DetailLineWithCopy(label: String, value: String, onCopy: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.bodyLarge)
-        }
-        TextButton(onClick = onCopy) { Text("Copy") }
-    }
+private fun Credential.displayTitle(): String = when (CredentialCategory.fromStored(category)) {
+    CredentialCategory.EMAIL -> description.ifBlank { emailLogin.orEmpty().ifBlank { "Email" } }
+    CredentialCategory.BANK -> description.ifBlank { bankAccountNo.orEmpty().ifBlank { "Bank" } }
+    CredentialCategory.CARD -> description.ifBlank { "Card" }
+    CredentialCategory.IDENTITY -> description.ifBlank { "Identity" }
+    CredentialCategory.OTHER -> title.ifBlank { "Credential" }
 }
+
+private fun Credential.displaySubtitle(): String? = when (CredentialCategory.fromStored(category)) {
+    CredentialCategory.EMAIL -> emailLogin
+    CredentialCategory.BANK -> bankCustomerId ?: bankAccountNo
+    CredentialCategory.CARD -> cardNumber?.chunked(4)?.joinToString("-")
+    CredentialCategory.IDENTITY -> identityId?.chunked(4)?.joinToString("-")
+    CredentialCategory.OTHER -> username
+}?.takeIf { it.isNotBlank() }

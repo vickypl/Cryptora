@@ -15,6 +15,8 @@ class SecureClipboard(context: Context) {
 
     fun copyUsernameOrEmail(usernameOrEmail: String) = copySensitive(label = "username_or_email", value = usernameOrEmail)
 
+    fun copyField(label: String, value: String) = copySensitive(label = label, value = value)
+
     private fun copySensitive(label: String, value: String) {
         clipboardManager.setPrimaryClip(ClipData.newPlainText(label, value))
         CoroutineScope(Dispatchers.Main).launch {

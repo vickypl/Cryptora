@@ -1,84 +1,98 @@
-# Cryptora - Offline Android Password Vault
+# Cryptora - Offline Password Vault for Android
 
-Cryptora is a fully offline password vault built with Kotlin, Jetpack Compose, MVVM, Room, SQLCipher, and Android Keystore.
+## 1) What is Cryptora?
 
-## Features
+Cryptora is a private password manager that works fully offline on your Android phone.
 
-- 100% offline operation with **no internet permissions**.
-- Master password setup with PBKDF2WithHmacSHA256 (210,000 iterations).
-- Encrypted SQLCipher database (`vault_encrypted.db`).
-- Keystore-based wrapping of database key.
-- Optional PIN fallback and lockout after 5 failed attempts (30 seconds).
-- Biometric permission support (`USE_BIOMETRIC`) and settings toggle.
-- Clipboard auto-clear after 15 seconds for copied passwords.
-- Auto-lock on background and inactivity.
-- Root detection warning.
-- Screenshot hardening via `FLAG_SECURE`.
-- Min SDK 26, target SDK 35.
+You can store login details (like app/site name, username, password, notes, and links) in one secure place and unlock everything with a **master password** that only you know.
 
-## Architecture
+Because it works offline, your data is not uploaded to cloud servers by this app.
 
-- **MVVM**:
-  - `SessionViewModel` controls lock/unlock session state.
-  - `VaultViewModel` handles credential CRUD and filtering.
-- **Data layer**:
-  - Room DAO/entity in `data/local`.
-  - Repository abstraction in `data/repository`.
-- **Security layer**:
-  - PBKDF2 derivation, encrypted shared prefs, keystore wrapping, root checks.
-- **UI**:
-  - Compose screens: setup, unlock, vault list, add credential, detail dialog.
+---
 
-## Security Model
+## 2) Features
 
-1. User sets master password on first launch.
-2. App generates 32-byte salt and derives hash via PBKDF2-HMAC-SHA256.
-3. App generates random 32-byte SQLCipher key.
-4. SQLCipher key is wrapped with Android Keystore AES key.
-5. Only salt, master hash, wrapped key, and IV are persisted in encrypted preferences.
-6. Master password is never stored plaintext.
+### Core vault experience
+- Store and manage passwords, usernames, URLs, notes, and categories.
+- Fast search to find saved entries quickly.
+- Clean add/edit/view flow for credentials.
 
-## Setup & Build
+### Master password protection
+- On first launch, you create a **master password**.
+- This master password is required to unlock the vault.
+- Your vault data is saved in encrypted form on device storage.
 
-### Requirements
+### Backup and restore (with encrypted file)
+- You can back up your vault to a file.
+- Backup file is encrypted before it is saved.
+- During restore, the app decrypts that file using your master password.
+- If the password is wrong (or file is damaged), restore will fail safely.
 
-- Android Studio Koala or newer
-- JDK 17
-- Android SDK 35
+### Extra protection
+- Optional PIN support.
+- Optional biometric unlock (device support required).
+- Auto-lock after inactivity/background.
+- Copy-to-clipboard auto-clear.
+- Screenshot blocking on sensitive screens.
 
-### Build
+### Privacy-first
+- Designed for offline use.
+- No internet permission in normal use.
+
+---
+
+## 3) Setup Guide (ZIP -> APK -> Install)
+
+Follow these steps if you downloaded the project as a ZIP and want to install the app APK.
+
+### Step A: Download and extract
+1. Download the project ZIP.
+2. Extract it (unzip) to a folder on your computer.
+3. Open terminal/command prompt in that extracted folder.
+
+### Step B: Build APK
+> Requirement: Android SDK + JDK 17 installed.
+
+Run:
 
 ```bash
-./gradlew assembleDebug
+./gradlew :app:packageCryptoraApk
 ```
 
-### Run tests
+After build completes, APK will be available at:
 
-```bash
-./gradlew test
+```text
+app/build/outputs/apk/cryptora/release/Cryptora.apk
 ```
 
-## Usage Guide
+### Step C: Move APK to your phone
+Use any one method:
+- USB file transfer
+- Nearby Share
+- Cloud drive (upload/download manually)
 
-1. Launch app and create a master password (PIN optional).
-2. Unlock with master password/PIN.
-3. Add credentials using the FAB.
-4. Use search to filter entries.
-5. Open detail and copy password to clipboard (auto-clears in 15s).
-6. Toggle biometric option in vault home settings row.
+### Step D: Install on Android
+1. On your phone, open the APK file.
+2. If prompted, allow installation from this source.
+3. Continue and install.
 
-## Permissions
+If install is blocked:
+- Remove older Cryptora app first (if signed differently).
+- Make sure file name is `Cryptora.apk` from the latest build.
+- Rebuild using the command above and copy again.
 
-Allowed:
-- `android.permission.USE_BIOMETRIC`
+---
 
-Not present:
-- `INTERNET`
-- `ACCESS_NETWORK_STATE`
-- `READ_EXTERNAL_STORAGE`
-- `WRITE_EXTERNAL_STORAGE`
+## First-time use
+1. Open Cryptora.
+2. Set your master password.
+3. (Optional) Enable PIN/biometric.
+4. Start adding your credentials.
+5. Create a backup file and keep it safe.
 
-## Notes
+---
 
-- Backup/import/export screen hooks are planned and should use encrypted `.enc` files in app-private storage only.
-- Release builds enable R8/ProGuard.
+## Important notes
+- If you forget your master password, you cannot unlock encrypted vault data.
+- Keep your backup file and master password safe.
+- For regular users, installing APK from project releases/artifacts is easier than local building.

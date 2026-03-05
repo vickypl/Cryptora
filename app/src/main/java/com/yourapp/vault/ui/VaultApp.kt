@@ -123,7 +123,7 @@ fun VaultApp(
     onUserActivity: () -> Unit,
     lockoutMs: Long,
     sessionRemainingMs: Long,
-    onImportBackup: suspend (Uri, String) -> Result<Int>,
+    onImportBackup: suspend (Uri, String, String?) -> Result<Int>,
     onActiveBackupUriRequest: () -> Uri?,
     vaultViewModel: VaultViewModel?
 ) {
@@ -469,7 +469,7 @@ private fun VaultHome(
     onRequireLock: () -> Unit,
     onUserActivity: () -> Unit,
     sessionRemainingMs: Long,
-    onImportBackup: suspend (Uri, String) -> Result<Int>,
+    onImportBackup: suspend (Uri, String, String?) -> Result<Int>,
     onActiveBackupUriRequest: () -> Uri?,
     viewModel: VaultViewModel?
 ) {
@@ -790,7 +790,7 @@ private fun SettingsDialog(
     selectedSessionLimit: String,
     onSessionLimitSelected: (String) -> Unit,
     onChangeMasterPassword: (next: String) -> String?,
-    onImportBackup: suspend (Uri, String) -> Result<Int>,
+    onImportBackup: suspend (Uri, String, String?) -> Result<Int>,
     activeBackupUri: Uri?,
     onImportSuccess: (Int) -> Unit,
     onDismiss: () -> Unit
@@ -804,6 +804,8 @@ private fun SettingsDialog(
     var showImportDialog by remember { mutableStateOf(false) }
     var importError by remember { mutableStateOf<String?>(null) }
     var importLoading by remember { mutableStateOf(false) }
+    var requireCurrentMasterPassword by remember { mutableStateOf(false) }
+    var currentMasterPasswordOverride by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -816,6 +818,8 @@ private fun SettingsDialog(
             }
             importUri = uri
             importError = null
+            requireCurrentMasterPassword = false
+            currentMasterPasswordOverride = ""
             showImportDialog = true
         }
     }
@@ -949,11 +953,16 @@ private fun SettingsDialog(
         ImportPasswordDialog(
             isLoading = importLoading,
             errorMessage = importError,
+            requireCurrentMasterPassword = requireCurrentMasterPassword,
+            currentMasterPassword = currentMasterPasswordOverride,
+            onCurrentMasterPasswordChange = { currentMasterPasswordOverride = it },
             onDismiss = {
                 if (!importLoading) {
                     showImportDialog = false
                     importUri = null
                     importError = null
+                    requireCurrentMasterPassword = false
+                    currentMasterPasswordOverride = ""
                 }
             },
             onConfirm = { password ->
@@ -963,21 +972,30 @@ private fun SettingsDialog(
                     importError = "No backup file selected"
                 } else if (enteredPassword.isBlank()) {
                     importError = "Password is required"
+                } else if (requireCurrentMasterPassword && currentMasterPasswordOverride.trim().isBlank()) {
+                    importError = "Enter current app master password"
                 } else {
                     importLoading = true
                     importError = null
                     scope.launch {
-                        val result = withContext(Dispatchers.IO) { onImportBackup(uri, enteredPassword) }
+                        val overridePassword = currentMasterPasswordOverride.trim().takeIf { it.isNotBlank() }
+                        val result = withContext(Dispatchers.IO) { onImportBackup(uri, enteredPassword, overridePassword) }
                         importLoading = false
                         result.fold(
                             onSuccess = { count ->
                                 showImportDialog = false
                                 importUri = null
                                 importError = null
+                                requireCurrentMasterPassword = false
+                                currentMasterPasswordOverride = ""
                                 onImportSuccess(count)
                             },
                             onFailure = { error ->
-                                importError = error.message ?: "Wrong password or corrupted file"
+                                val message = error.message ?: "Wrong password or corrupted file"
+                                importError = message
+                                if (message.contains("Current app master password unavailable", ignoreCase = true)) {
+                                    requireCurrentMasterPassword = true
+                                }
                             }
                         )
                     }
@@ -1004,7 +1022,10 @@ private fun ImportPasswordDialog(
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
     isLoading: Boolean = false,
-    errorMessage: String? = null
+    errorMessage: String? = null,
+    requireCurrentMasterPassword: Boolean = false,
+    currentMasterPassword: String = "",
+    onCurrentMasterPasswordChange: (String) -> Unit = {}
 ) {
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -1049,11 +1070,26 @@ private fun ImportPasswordDialog(
                     keyboardActions = KeyboardActions(onDone = { if (password.isNotBlank()) onConfirm(password) }),
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (requireCurrentMasterPassword) {
+                    OutlinedTextField(
+                        value = currentMasterPassword,
+                        onValueChange = onCurrentMasterPasswordChange,
+                        label = { Text("Current App Master Password") },
+                        singleLine = true,
+                        enabled = !isLoading,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !isLoading) { Text("Cancel") } },
         confirmButton = {
-            Button(onClick = { onConfirm(password) }, enabled = password.isNotBlank() && !isLoading) {
+            Button(
+                onClick = { onConfirm(password) },
+                enabled = password.isNotBlank() && !isLoading && (!requireCurrentMasterPassword || currentMasterPassword.isNotBlank())
+            ) {
                 if (isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.size(8.dp))

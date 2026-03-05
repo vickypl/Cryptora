@@ -259,8 +259,8 @@ class MainActivity : FragmentActivity() {
                         onUserActivity = { sessionVm.resetInactivityTimer() },
                         lockoutMs = appContainer.authManager.lockoutRemainingMs(),
                         sessionRemainingMs = sessionRemainingMs,
-                        onImportBackup = { backupUri, importPassword ->
-                            val currentPassword = sessionVm.getMasterPassword()?.concatToString()
+                        onImportBackup = { backupUri, importPassword, currentMasterPasswordOverride ->
+                            val currentPassword = sessionVm.getMasterPassword()?.concatToString() ?: currentMasterPasswordOverride
                             if (currentPassword == null) {
                                 Result.failure(
                                     IllegalStateException("Current app master password unavailable. Unlock with master password and retry import.")

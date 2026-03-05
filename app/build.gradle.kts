@@ -64,9 +64,17 @@ android {
 
 tasks.register<Copy>("packageCryptoraApk") {
     dependsOn("assembleRelease")
-    from(layout.buildDirectory.file("outputs/apk/release/app-release.apk"))
+    from(layout.buildDirectory.dir("outputs/apk/release")) {
+        include("app-release.apk", "app-release-unsigned.apk")
+    }
     into(layout.buildDirectory.dir("outputs/apk/cryptora/release"))
     rename { "Cryptora.apk" }
+
+    doLast {
+        check(layout.buildDirectory.file("outputs/apk/cryptora/release/Cryptora.apk").get().asFile.exists()) {
+            "Cryptora.apk was not created. Expected source release APK not found under build/outputs/apk/release/."
+        }
+    }
 }
 
 ksp {

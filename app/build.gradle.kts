@@ -23,6 +23,9 @@ android {
 
     buildTypes {
         release {
+            // Keep release optimizations but sign with debug key so generated APK is installable
+            // when no custom release keystore is configured (e.g., CI artifact builds).
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -64,15 +67,13 @@ android {
 
 tasks.register<Copy>("packageCryptoraApk") {
     dependsOn("assembleRelease")
-    from(layout.buildDirectory.dir("outputs/apk/release")) {
-        include("app-release.apk", "app-release-unsigned.apk")
-    }
+    from(layout.buildDirectory.file("outputs/apk/release/app-release.apk"))
     into(layout.buildDirectory.dir("outputs/apk/cryptora/release"))
     rename { "Cryptora.apk" }
 
     doLast {
         check(layout.buildDirectory.file("outputs/apk/cryptora/release/Cryptora.apk").get().asFile.exists()) {
-            "Cryptora.apk was not created. Expected source release APK not found under build/outputs/apk/release/."
+            "Cryptora.apk was not created. Expected signed release APK build/outputs/apk/release/app-release.apk was not found."
         }
     }
 }

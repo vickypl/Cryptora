@@ -6,6 +6,7 @@ import com.yourapp.vault.data.local.CredentialEntity
 import com.yourapp.vault.data.local.toDomain
 import com.yourapp.vault.data.local.toEntity
 import com.yourapp.vault.domain.model.Credential
+import kotlinx.coroutines.flow.Flow
 
 class VaultRepository(private val dao: CredentialDao) {
     fun getCredentialsPaged(): PagingSource<Int, CredentialEntity> = dao.getCredentialsPaged()
@@ -17,6 +18,8 @@ class VaultRepository(private val dao: CredentialDao) {
     suspend fun upsertAll(credentials: List<Credential>) = dao.upsertAll(credentials.map { it.toEntity() })
 
     suspend fun listAllCredentials(): List<Credential> = dao.listAll().map { it.toDomain() }
+
+    fun observeCredentialCount(): Flow<Int> = dao.observeCredentialCount()
 
     suspend fun getCredential(id: String): Credential? = dao.getById(id)?.toDomain()
 

@@ -358,6 +358,12 @@ private fun UnlockScreen(
                 letterSpacing = 1.5.sp,
                 textAlign = TextAlign.Center
             )
+            Text(
+                text = "Mail: vicky542011@gmail.com",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f),
+                textAlign = TextAlign.Center
+            )
 
             CryptoraCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -456,6 +462,7 @@ private fun VaultHome(
 
     val credentials = viewModel.credentials.collectAsLazyPagingItems()
     val query by viewModel.query.collectAsStateWithLifecycleCompat()
+    val credentialCount by viewModel.credentialCount.collectAsStateWithLifecycleCompat()
     var adding by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<Credential?>(null) }
     var editing by remember { mutableStateOf<Credential?>(null) }
@@ -476,7 +483,7 @@ private fun VaultHome(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text("Vault", style = MaterialTheme.typography.titleLarge)
+                    Text("Vault ($credentialCount)", style = MaterialTheme.typography.titleLarge)
                     Text(
                         text = if (sessionRemainingMs < 0) "Auto-lock: Not required" else "Auto-lock in ${formatRemainingTime(sessionRemainingMs)}",
                         style = MaterialTheme.typography.bodySmall,

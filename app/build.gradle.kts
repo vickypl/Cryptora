@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.Copy
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -21,6 +23,9 @@ android {
 
     buildTypes {
         release {
+            // Keep release optimizations but sign with debug key so generated APK is installable
+            // when no custom release keystore is configured (e.g., CI artifact builds).
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -60,6 +65,18 @@ android {
     }
 }
 
+tasks.register<Copy>("packageCryptoraApk") {
+    dependsOn("assembleRelease")
+    from(layout.buildDirectory.file("outputs/apk/release/app-release.apk"))
+    into(layout.buildDirectory.dir("outputs/apk/cryptora/release"))
+    rename { "Cryptora.apk" }
+
+    doLast {
+        check(layout.buildDirectory.file("outputs/apk/cryptora/release/Cryptora.apk").get().asFile.exists()) {
+            "Cryptora.apk was not created. Expected signed release APK build/outputs/apk/release/app-release.apk was not found."
+        }
+    }
+}
 
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
@@ -98,6 +115,8 @@ dependencies {
 
     implementation("net.zetetic:android-database-sqlcipher:4.5.4")
     implementation("androidx.sqlite:sqlite-ktx:2.4.0")
+    implementation("com.google.code.findbugs:jsr305:3.0.2")
+    implementation("javax.annotation:javax.annotation-api:1.3.2")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

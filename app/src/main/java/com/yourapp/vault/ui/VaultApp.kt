@@ -995,6 +995,7 @@ private fun SettingsDialog(
                                 importError = message
                                 if (message.contains("Current app master password unavailable", ignoreCase = true)) {
                                     requireCurrentMasterPassword = true
+                                    importError = "You unlocked via biometric. Enter your current app master password below to re-encrypt imported backup for future sync."
                                 }
                             }
                         )

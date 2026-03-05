@@ -58,6 +58,8 @@ class VaultViewModel(
     val credentialCount: StateFlow<Int> = repository.observeCredentialCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+    private var activeSyncPassword: CharArray? = null
+
     fun setQuery(value: String) {
         _query.value = value
     }
@@ -66,6 +68,8 @@ class VaultViewModel(
     fun registerBackupTarget(directoryUri: android.net.Uri, masterPassword: String) {
         val activeUri = backupDirectoryProvider?.invoke() ?: return
         if (activeUri != directoryUri) return
+        activeSyncPassword?.fill('\u0000')
+        activeSyncPassword = masterPassword.toCharArray()
         syncBackupWithPassword(masterPassword.toCharArray())
     }
 
@@ -85,7 +89,6 @@ class VaultViewModel(
             }
 
             repository.upsertAll(restored)
-            onBackupTargetActivated(backupUri)
 
             val syncPassword = currentMasterPassword.toCharArray()
             try {
@@ -94,6 +97,10 @@ class VaultViewModel(
             } finally {
                 syncPassword.fill('\u0000')
             }
+
+            onBackupTargetActivated(backupUri)
+            activeSyncPassword?.fill('\u0000')
+            activeSyncPassword = currentMasterPassword.toCharArray()
 
             restored.size
         }
@@ -126,6 +133,8 @@ class VaultViewModel(
                     manager.writeVault(directory, snapshot, passwordChars)
                         .getOrElse { throw it }
                 }
+                activeSyncPassword?.fill('\u0000')
+                activeSyncPassword = newPassword.toCharArray()
             } finally {
                 passwordChars.fill('\u0000')
             }
@@ -154,11 +163,17 @@ class VaultViewModel(
     }
 
     private fun syncBackup() {
-        val password = masterPasswordProvider?.invoke() ?: run {
+        val password = activeSyncPassword?.copyOf() ?: masterPasswordProvider?.invoke() ?: run {
             Log.w(TAG, "syncBackup skipped: no master password in active session")
             return
         }
         syncBackupWithPassword(password)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        activeSyncPassword?.fill('\u0000')
+        activeSyncPassword = null
     }
 
     companion object {

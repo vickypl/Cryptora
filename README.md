@@ -49,7 +49,7 @@ Cryptora is a fully offline password vault built with Kotlin, Jetpack Compose, M
 ### Build
 
 ```bash
-./gradlew assembleDebug
+./gradlew assembleRelease
 ```
 
 ### Run tests

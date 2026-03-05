@@ -60,6 +60,13 @@ android {
     }
 }
 
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        variant.outputs.forEach { output ->
+            output.outputFileName.set("Cryptora.apk")
+        }
+    }
+}
 
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")

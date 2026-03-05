@@ -106,6 +106,8 @@ dependencies {
 
     implementation("net.zetetic:android-database-sqlcipher:4.5.4")
     implementation("androidx.sqlite:sqlite-ktx:2.4.0")
+    implementation("com.google.code.findbugs:jsr305:3.0.2")
+    implementation("javax.annotation:javax.annotation-api:1.3.2")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.Copy
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -60,12 +62,11 @@ android {
     }
 }
 
-androidComponents {
-    onVariants(selector().withBuildType("release")) { variant ->
-        variant.outputs.forEach { output ->
-            output.outputFileName.set("Cryptora.apk")
-        }
-    }
+tasks.register<Copy>("packageCryptoraApk") {
+    dependsOn("assembleRelease")
+    from(layout.buildDirectory.file("outputs/apk/release/app-release.apk"))
+    into(layout.buildDirectory.dir("outputs/apk/release"))
+    rename { "Cryptora.apk" }
 }
 
 ksp {

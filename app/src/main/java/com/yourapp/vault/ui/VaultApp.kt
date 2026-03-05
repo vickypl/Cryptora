@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -71,6 +72,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
@@ -341,78 +343,90 @@ private fun UnlockScreen(
                 .alpha(0.08f)
         )
 
-        CryptoraCard(
+        Column(
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth()
-                .widthIn(max = 460.dp)
+                .widthIn(max = 460.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Secure Vault Login",
-                    style = MaterialTheme.typography.headlineSmall,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "Authenticate to access your encrypted credentials.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-                if (lockoutMs > 0) {
+            Text(
+                text = "App by: Vicky",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f),
+                letterSpacing = 1.5.sp,
+                textAlign = TextAlign.Center
+            )
+
+            CryptoraCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        text = "Too many failed attempts. Retry in ${lockoutMs / 1000}s",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = "Secure Vault Login",
+                        style = MaterialTheme.typography.headlineSmall,
                         textAlign = TextAlign.Center
                     )
-                }
+                    Text(
+                        text = "Authenticate to access your encrypted credentials.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                    if (lockoutMs > 0) {
+                        Text(
+                            text = "Too many failed attempts. Retry in ${lockoutMs / 1000}s",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
 
-                CryptoraTextField(
-                    value = password,
-                    onValueChange = { onUserActivity(); password = it },
-                    label = "Master Password",
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    enabled = lockoutMs == 0L,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                    CryptoraTextField(
+                        value = password,
+                        onValueChange = { onUserActivity(); password = it },
+                        label = "Master Password",
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        enabled = lockoutMs == 0L,
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
-                if (biometricEnabled) {
-                    FilledTonalButton(
+                    if (biometricEnabled) {
+                        FilledTonalButton(
+                            enabled = lockoutMs == 0L,
+                            onClick = {
+                                onUserActivity()
+                                onBiometricUnlock { unlockError ->
+                                    error = unlockError
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("Unlock with Biometrics") }
+                    }
+
+                    Button(
                         enabled = lockoutMs == 0L,
                         onClick = {
                             onUserActivity()
-                            onBiometricUnlock { unlockError ->
-                                error = unlockError
-                            }
+                            error = onUnlock(password.ifBlank { null })
                         },
                         modifier = Modifier.fillMaxWidth()
-                    ) { Text("Unlock with Biometrics") }
-                }
+                    ) { Text("Unlock") }
 
-                Button(
-                    enabled = lockoutMs == 0L,
-                    onClick = {
-                        onUserActivity()
-                        error = onUnlock(password.ifBlank { null })
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Unlock") }
-
-                error?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center
-                    )
+                    error?.let {
+                        Text(
+                            text = it,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
@@ -869,55 +883,92 @@ private fun SettingsDialog(
     }
 }
 
-private data class ThemeOption(val key: String, val label: String)
+private data class ThemeOption(
+    val key: String,
+    val label: String,
+    val accent: Color
+)
 
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ThemePickerSection(
     currentTheme: String,
     onThemeSelected: (String) -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
+
     val themes = listOf(
-        ThemeOption("BLOOD_VAULT", "🩸 Blood Vault") to Pair(Color(0xFF0D0000), Color(0xFFB71C1C)),
-        ThemeOption("MATRIX", "👾 Matrix") to Pair(Color(0xFF000000), Color(0xFF00FF41)),
-        ThemeOption("DEEP_OCEAN", "🌊 Deep Ocean") to Pair(Color(0xFF000A14), Color(0xFF00BCD4)),
-        ThemeOption("NUCLEAR", "☢️ Nuclear") to Pair(Color(0xFF0A0C00), Color(0xFFCCFF00)),
-        ThemeOption("INFERNO", "🔥 Inferno") to Pair(Color(0xFF0D0300), Color(0xFFFF6600)),
-        ThemeOption("CHROME_PUNK", "🤖 Chrome Punk") to Pair(Color(0xFF050608), Color(0xFFB0BEC5)),
-        ThemeOption("SAKURA_NOIR", "🌸 Sakura Noir") to Pair(Color(0xFF0A0008), Color(0xFFFF80AB))
+        ThemeOption("BLOOD_VAULT", "🩸 Blood Vault", Color(0xFFCC0000)),
+        ThemeOption("MATRIX", "👾 Matrix", Color(0xFF00FF41)),
+        ThemeOption("DEEP_OCEAN", "🌊 Deep Ocean", Color(0xFF00E5FF)),
+        ThemeOption("NUCLEAR", "☢️ Nuclear", Color(0xFFCCFF00)),
+        ThemeOption("INFERNO", "🔥 Inferno", Color(0xFFFF6600)),
+        ThemeOption("CHROME_PUNK", "🤖 Chrome Punk", Color(0xFFB0BEC5)),
+        ThemeOption("SAKURA_NOIR", "🌸 Sakura Noir", Color(0xFFFF80AB))
     )
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        themes.forEach { (theme, colors) ->
-            val (bgColor, accentColor) = colors
-            val isSelected = currentTheme == theme.key
+    val selected = themes.firstOrNull { it.key == currentTheme } ?: themes.first { it.key == "MATRIX" }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(bgColor, RoundedCornerShape(12.dp))
-                    .border(
-                        width = if (isSelected) 2.dp else 0.5.dp,
-                        color = if (isSelected) accentColor else accentColor.copy(alpha = 0.3f)
-                    )
-                    .clickable { onThemeSelected(theme.key) }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = theme.label,
-                    color = accentColor,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
+    ) {
+        OutlinedTextField(
+            value = selected.label,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Theme") },
+            leadingIcon = {
+                Box(
+                    modifier = Modifier
+                        .size(14.dp)
+                        .background(selected.accent, CircleShape)
                 )
-                if (isSelected) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = "Selected",
-                        tint = accentColor
-                    )
-                }
+            },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor()
+        )
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            themes.forEach { theme ->
+                val isSelected = theme.key == currentTheme
+                DropdownMenuItem(
+                    text = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .background(theme.accent, CircleShape)
+                            )
+                            Text(
+                                text = theme.label,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    },
+                    trailingIcon = {
+                        if (isSelected) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Selected",
+                                tint = theme.accent,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    },
+                    onClick = {
+                        onThemeSelected(theme.key)
+                        expanded = false
+                    }
+                )
             }
         }
     }

@@ -65,7 +65,7 @@ android {
 tasks.register<Copy>("packageCryptoraApk") {
     dependsOn("assembleRelease")
     from(layout.buildDirectory.file("outputs/apk/release/app-release.apk"))
-    into(layout.buildDirectory.dir("outputs/apk/release"))
+    into(layout.buildDirectory.dir("outputs/apk/cryptora/release"))
     rename { "Cryptora.apk" }
 }
 

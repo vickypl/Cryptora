@@ -72,7 +72,7 @@ class VaultViewModel(
     suspend fun importBackup(
         backupUri: Uri,
         importPassword: String,
-        currentMasterPassword: String?,
+        currentMasterPassword: String,
         onBackupTargetActivated: (Uri) -> Unit
     ): Result<Int> {
         val manager = backupManager ?: return Result.failure(IllegalStateException("Backup manager unavailable"))
@@ -87,7 +87,7 @@ class VaultViewModel(
             repository.upsertAll(restored)
             onBackupTargetActivated(backupUri)
 
-            val syncPassword = (currentMasterPassword ?: importPassword).toCharArray()
+            val syncPassword = currentMasterPassword.toCharArray()
             try {
                 manager.writeVault(backupUri, repository.listAllCredentials(), syncPassword)
                     .getOrElse { throw it }

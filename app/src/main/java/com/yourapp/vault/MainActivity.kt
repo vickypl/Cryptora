@@ -261,12 +261,18 @@ class MainActivity : FragmentActivity() {
                         sessionRemainingMs = sessionRemainingMs,
                         onImportBackup = { backupUri, importPassword ->
                             val currentPassword = sessionVm.getMasterPassword()?.concatToString()
-                            vaultViewModel?.importBackup(
-                                backupUri = backupUri,
-                                importPassword = importPassword,
-                                currentMasterPassword = currentPassword,
-                                onBackupTargetActivated = { appContainer.persistVaultDirectory(it) }
-                            ) ?: Result.failure(IllegalStateException("Vault unavailable"))
+                            if (currentPassword == null) {
+                                Result.failure(
+                                    IllegalStateException("Current app master password unavailable. Unlock with master password and retry import.")
+                                )
+                            } else {
+                                vaultViewModel?.importBackup(
+                                    backupUri = backupUri,
+                                    importPassword = importPassword,
+                                    currentMasterPassword = currentPassword,
+                                    onBackupTargetActivated = { appContainer.persistVaultDirectory(it) }
+                                ) ?: Result.failure(IllegalStateException("Vault unavailable"))
+                            }
                         },
                         onActiveBackupUriRequest = appContainer::selectedVaultDirectory,
                         vaultViewModel = vaultViewModel

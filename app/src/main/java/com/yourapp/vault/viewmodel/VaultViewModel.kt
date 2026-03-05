@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.net.Uri
 
 class VaultViewModel(
     private val repository: VaultRepository,
@@ -66,6 +67,36 @@ class VaultViewModel(
         val activeUri = backupDirectoryProvider?.invoke() ?: return
         if (activeUri != directoryUri) return
         syncBackupWithPassword(masterPassword.toCharArray())
+    }
+
+    suspend fun importBackup(
+        backupUri: Uri,
+        importPassword: String,
+        currentMasterPassword: String?,
+        onBackupTargetActivated: (Uri) -> Unit
+    ): Result<Int> {
+        val manager = backupManager ?: return Result.failure(IllegalStateException("Backup manager unavailable"))
+        return runCatching {
+            val importPasswordChars = importPassword.toCharArray()
+            val restored = try {
+                manager.restoreVault(backupUri, importPasswordChars).getOrElse { throw it }
+            } finally {
+                importPasswordChars.fill('\u0000')
+            }
+
+            repository.upsertAll(restored)
+            onBackupTargetActivated(backupUri)
+
+            val syncPassword = (currentMasterPassword ?: importPassword).toCharArray()
+            try {
+                manager.writeVault(backupUri, repository.listAllCredentials(), syncPassword)
+                    .getOrElse { throw it }
+            } finally {
+                syncPassword.fill('\u0000')
+            }
+
+            restored.size
+        }
     }
 
     fun save(credential: Credential) {

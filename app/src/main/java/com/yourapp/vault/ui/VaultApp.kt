@@ -1,5 +1,6 @@
 package com.yourapp.vault.ui
 
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -31,6 +33,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -70,7 +76,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.paging.LoadState
@@ -111,6 +123,8 @@ fun VaultApp(
     onUserActivity: () -> Unit,
     lockoutMs: Long,
     sessionRemainingMs: Long,
+    onImportBackup: suspend (Uri, String) -> Result<Int>,
+    onActiveBackupUriRequest: () -> Uri?,
     vaultViewModel: VaultViewModel?
 ) {
     AnimatedContent(
@@ -139,6 +153,8 @@ fun VaultApp(
                 onRequireLock = onRequireLock,
                 onUserActivity = onUserActivity,
                 sessionRemainingMs = sessionRemainingMs,
+                onImportBackup = onImportBackup,
+                onActiveBackupUriRequest = onActiveBackupUriRequest,
                 viewModel = vm
             )
         }
@@ -453,6 +469,8 @@ private fun VaultHome(
     onRequireLock: () -> Unit,
     onUserActivity: () -> Unit,
     sessionRemainingMs: Long,
+    onImportBackup: suspend (Uri, String) -> Result<Int>,
+    onActiveBackupUriRequest: () -> Uri?,
     viewModel: VaultViewModel?
 ) {
     if (viewModel == null) {
@@ -591,6 +609,8 @@ private fun VaultHome(
                 onUserActivity()
                 onChangeMasterPassword(next)
             },
+            onImportBackup = onImportBackup,
+            activeBackupUri = onActiveBackupUriRequest(),
             onDismiss = { settingsOpen = false }
         )
     }
@@ -767,6 +787,8 @@ private fun SettingsDialog(
     selectedSessionLimit: String,
     onSessionLimitSelected: (String) -> Unit,
     onChangeMasterPassword: (next: String) -> String?,
+    onImportBackup: suspend (Uri, String) -> Result<Int>,
+    activeBackupUri: Uri?,
     onDismiss: () -> Unit
 ) {
     var newPassword by remember { mutableStateOf("") }
@@ -774,6 +796,25 @@ private fun SettingsDialog(
     var passwordError by remember { mutableStateOf<String?>(null) }
     var showPasswordChangedPopup by remember { mutableStateOf(false) }
     var sessionMenuExpanded by remember { mutableStateOf(false) }
+    var importUri by remember { mutableStateOf<Uri?>(null) }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var importError by remember { mutableStateOf<String?>(null) }
+    var importLoading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            }
+            importUri = uri
+            importError = null
+            showImportDialog = true
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -835,6 +876,28 @@ private fun SettingsDialog(
 
                 HorizontalDivider()
 
+                Text("Backup", style = MaterialTheme.typography.titleMedium)
+                Button(
+                    onClick = { filePickerLauncher.launch(arrayOf("application/octet-stream")) },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !importLoading
+                ) {
+                    Icon(Icons.Default.FolderOpen, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text("Import Backup")
+                }
+                activeBackupUri?.let {
+                    Text(
+                        text = "Active backup: ${it.lastPathSegment ?: "Unknown"}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                HorizontalDivider()
+
                 Text("Change Master Password", style = MaterialTheme.typography.titleMedium)
                 CryptoraTextField(
                     value = newPassword,
@@ -878,6 +941,43 @@ private fun SettingsDialog(
         }
     )
 
+    if (showImportDialog) {
+        ImportPasswordDialog(
+            isLoading = importLoading,
+            errorMessage = importError,
+            onDismiss = {
+                if (!importLoading) {
+                    showImportDialog = false
+                    importUri = null
+                    importError = null
+                }
+            },
+            onConfirm = onConfirm@{ password ->
+                val uri = importUri
+                if (uri == null) {
+                    importError = "No backup file selected"
+                    return@onConfirm
+                }
+                importLoading = true
+                importError = null
+                scope.launch {
+                    val result = withContext(Dispatchers.IO) { onImportBackup(uri, password) }
+                    importLoading = false
+                    result.fold(
+                        onSuccess = { count ->
+                            showImportDialog = false
+                            importUri = null
+                            passwordError = "Import success: imported $count credentials"
+                        },
+                        onFailure = { error ->
+                            importError = error.message ?: "Wrong password or corrupted file"
+                        }
+                    )
+                }
+            }
+        )
+    }
+
     if (showPasswordChangedPopup) {
         AlertDialog(
             onDismissRequest = { showPasswordChangedPopup = false },
@@ -888,6 +988,72 @@ private fun SettingsDialog(
             }
         )
     }
+}
+
+
+@Composable
+private fun ImportPasswordDialog(
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+    isLoading: Boolean = false,
+    errorMessage: String? = null
+) {
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = { if (!isLoading) onDismiss() },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Icons.Default.Lock, contentDescription = null)
+                Text("Decrypt Backup File")
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Enter the master password used to encrypt this backup file.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Backup Password") },
+                    singleLine = true,
+                    enabled = !isLoading,
+                    isError = errorMessage != null,
+                    supportingText = {
+                        if (errorMessage != null) {
+                            Text(errorMessage, color = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = null
+                            )
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (password.isNotBlank()) onConfirm(password) }),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !isLoading) { Text("Cancel") } },
+        confirmButton = {
+            Button(onClick = { onConfirm(password) }, enabled = password.isNotBlank() && !isLoading) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.size(8.dp))
+                }
+                Text("Import")
+            }
+        }
+    )
 }
 
 private data class ThemeOption(

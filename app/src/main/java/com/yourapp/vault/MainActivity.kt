@@ -259,6 +259,16 @@ class MainActivity : FragmentActivity() {
                         onUserActivity = { sessionVm.resetInactivityTimer() },
                         lockoutMs = appContainer.authManager.lockoutRemainingMs(),
                         sessionRemainingMs = sessionRemainingMs,
+                        onImportBackup = { backupUri, importPassword ->
+                            val currentPassword = sessionVm.getMasterPassword()?.concatToString()
+                            vaultViewModel?.importBackup(
+                                backupUri = backupUri,
+                                importPassword = importPassword,
+                                currentMasterPassword = currentPassword,
+                                onBackupTargetActivated = { appContainer.persistVaultDirectory(it) }
+                            ) ?: Result.failure(IllegalStateException("Vault unavailable"))
+                        },
+                        onActiveBackupUriRequest = appContainer::selectedVaultDirectory,
                         vaultViewModel = vaultViewModel
                     )
                 }

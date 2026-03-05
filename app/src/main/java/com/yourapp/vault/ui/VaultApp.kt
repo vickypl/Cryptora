@@ -481,7 +481,7 @@ private fun VaultHome(
                 value = query,
                 onValueChange = { onUserActivity(); viewModel.setQuery(it) },
                 label = { Text("Search Vault") },
-                supportingText = { Text("Title, username/email, type, URL or notes") },
+                supportingText = { Text("Search by description") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -664,12 +664,7 @@ private fun CredentialDetailDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = credential.displayTitle(),
-                style = MaterialTheme.typography.headlineSmall
-            )
-        },
+        title = { Text("Credential Details", style = MaterialTheme.typography.headlineSmall) },
         confirmButton = {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -692,6 +687,27 @@ private fun CredentialDetailDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                val createdText = remember(credential.createdAt) {
+                    java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.getDefault())
+                        .format(java.util.Date(credential.createdAt))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = category.toLabel(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = createdText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                HorizontalDivider()
                 CategoryFields(
                     category = category,
                     state = state,
@@ -925,12 +941,14 @@ private fun formatRemainingTime(ms: Long): String {
 }
 
 
-private fun Credential.displayTitle(): String = when (CredentialCategory.fromStored(category)) {
-    CredentialCategory.EMAIL -> description.ifBlank { emailLogin.orEmpty().ifBlank { "Email" } }
-    CredentialCategory.BANK -> description.ifBlank { bankAccountNo.orEmpty().ifBlank { "Bank" } }
-    CredentialCategory.CARD -> description.ifBlank { "Card" }
-    CredentialCategory.IDENTITY -> description.ifBlank { "Identity" }
-    CredentialCategory.OTHER -> title.ifBlank { "Credential" }
+private fun Credential.displayTitle(): String = description.ifBlank {
+    when (CredentialCategory.fromStored(category)) {
+        CredentialCategory.EMAIL -> emailLogin.orEmpty().ifBlank { "Email" }
+        CredentialCategory.BANK -> bankAccountNo.orEmpty().ifBlank { "Bank" }
+        CredentialCategory.CARD -> "Card"
+        CredentialCategory.IDENTITY -> "Identity"
+        CredentialCategory.OTHER -> title.ifBlank { "Credential" }
+    }
 }
 
 private fun Credential.displaySubtitle(): String? = when (CredentialCategory.fromStored(category)) {
@@ -940,3 +958,12 @@ private fun Credential.displaySubtitle(): String? = when (CredentialCategory.fro
     CredentialCategory.IDENTITY -> identityId?.chunked(4)?.joinToString("-")
     CredentialCategory.OTHER -> username
 }?.takeIf { it.isNotBlank() }
+
+
+private fun CredentialCategory.toLabel(): String = when (this) {
+    CredentialCategory.EMAIL -> "📧 Email"
+    CredentialCategory.BANK -> "🏦 Bank"
+    CredentialCategory.CARD -> "💳 Card"
+    CredentialCategory.IDENTITY -> "🪪 Identity"
+    CredentialCategory.OTHER -> "📁 Other"
+}

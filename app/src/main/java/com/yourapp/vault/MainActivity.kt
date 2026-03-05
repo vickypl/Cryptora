@@ -123,6 +123,9 @@ class MainActivity : FragmentActivity() {
                                 setupDone = true
                                 sessionVm.unlockWithPassword(master)
                                 sessionVm.resetInactivityTimer()
+                                if (restoreExisting) {
+                                    vaultViewModel?.registerBackupTarget(vaultDirectory, master)
+                                }
                             }
                         },
                         onHasExistingVault = { vaultDirectory ->

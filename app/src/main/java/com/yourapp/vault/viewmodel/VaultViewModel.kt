@@ -56,6 +56,13 @@ class VaultViewModel(
         _query.value = value
     }
 
+
+    fun registerBackupTarget(directoryUri: android.net.Uri, masterPassword: String) {
+        val activeUri = backupDirectoryProvider?.invoke() ?: return
+        if (activeUri != directoryUri) return
+        syncBackupWithPassword(masterPassword.toCharArray())
+    }
+
     fun save(credential: Credential) {
         viewModelScope.launch {
             repository.upsert(credential.copy(updatedAt = System.currentTimeMillis()))
@@ -89,14 +96,11 @@ class VaultViewModel(
         }
     }
 
-    private fun syncBackup() {
+
+    private fun syncBackupWithPassword(password: CharArray) {
         val manager = backupManager ?: return
         val directory = backupDirectoryProvider?.invoke() ?: run {
-            Log.w(TAG, "syncBackup skipped: no backup directory configured")
-            return
-        }
-        val password = masterPasswordProvider?.invoke() ?: run {
-            Log.w(TAG, "syncBackup skipped: no master password in active session")
+            password.fill('\u0000')
             return
         }
         viewModelScope.launch(Dispatchers.IO) {
@@ -111,6 +115,14 @@ class VaultViewModel(
                 password.fill('\u0000')
             }
         }
+    }
+
+    private fun syncBackup() {
+        val password = masterPasswordProvider?.invoke() ?: run {
+            Log.w(TAG, "syncBackup skipped: no master password in active session")
+            return
+        }
+        syncBackupWithPassword(password)
     }
 
     companion object {

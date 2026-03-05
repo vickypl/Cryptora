@@ -39,18 +39,18 @@ fun CategoryFields(
                 val digitsOnly = state.cardNumber.filter(Char::isDigit)
                 CopyableField("Description", state.description, onValueChange = { onStateChange(state.copy(description = it)) }, onCopy = { onCopy("Description", it) })
                 CopyableField(
+                    label = "Card Number (without hyphens)",
+                    value = digitsOnly,
+                    onValueChange = { raw -> onStateChange(state.copy(cardNumber = raw.filter(Char::isDigit).take(16))) },
+                    onCopy = { onCopy("Card Number (without hyphens)", it) }
+                )
+                CopyableField(
                     label = "Card Number (with hyphens)",
                     value = digitsOnly.chunked(4).joinToString("-"),
                     onValueChange = null,
                     onCopy = { onCopy("Card Number (with hyphens)", it) }
                 )
-                CopyableField(
-                    label = "Card Number (without hyphens)",
-                    value = digitsOnly,
-                    onValueChange = { raw -> onStateChange(state.copy(cardNumber = raw.filter(Char::isDigit))) },
-                    onCopy = { onCopy("Card Number (without hyphens)", it) }
-                )
-                CopyableField("CVV", state.cardCvv, isPassword = true, onValueChange = { onStateChange(state.copy(cardCvv = it)) }, onCopy = { onCopy("CVV", it) })
+                CopyableField("CVV", state.cardCvv, isPassword = true, onValueChange = { onStateChange(state.copy(cardCvv = it.take(4))) }, onCopy = { onCopy("CVV", it) })
                 CopyableField("Expiry Date (MM/YY)", state.cardExpiry, onValueChange = { onStateChange(state.copy(cardExpiry = it)) }, onCopy = { onCopy("Expiry Date", it) })
                 CopyableField("Notes", state.notes, onValueChange = { onStateChange(state.copy(notes = it)) }, onCopy = { onCopy("Notes", it) })
             }
@@ -59,21 +59,22 @@ fun CategoryFields(
                 val rawIdentity = state.identityId.replace("-", "")
                 CopyableField("Description", state.description, onValueChange = { onStateChange(state.copy(description = it)) }, onCopy = { onCopy("Description", it) })
                 CopyableField(
-                    label = "ID (with hyphens)",
-                    value = rawIdentity.chunked(4).joinToString("-"),
-                    onValueChange = null,
-                    onCopy = { onCopy("ID (with hyphens)", it) }
-                )
-                CopyableField(
                     label = "ID (without hyphens)",
                     value = rawIdentity,
                     onValueChange = { raw -> onStateChange(state.copy(identityId = raw.replace("-", ""))) },
                     onCopy = { onCopy("ID (without hyphens)", it) }
                 )
+                CopyableField(
+                    label = "ID (with hyphens)",
+                    value = rawIdentity.chunked(4).joinToString("-"),
+                    onValueChange = null,
+                    onCopy = { onCopy("ID (with hyphens)", it) }
+                )
                 CopyableField("Notes", state.notes, onValueChange = { onStateChange(state.copy(notes = it)) }, onCopy = { onCopy("Notes", it) })
             }
 
             CredentialCategory.OTHER -> {
+                CopyableField("Description", state.description, onValueChange = { onStateChange(state.copy(description = it)) }, onCopy = { onCopy("Description", it) })
                 CopyableField("Title", state.title, onValueChange = { onStateChange(state.copy(title = it)) }, onCopy = { onCopy("Title", it) })
                 CopyableField("Username", state.username, onValueChange = { onStateChange(state.copy(username = it)) }, onCopy = { onCopy("Username", it) })
                 CopyableField("Password", state.password, isPassword = true, onValueChange = { onStateChange(state.copy(password = it)) }, onCopy = { onCopy("Password", it) })

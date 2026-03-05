@@ -9,14 +9,14 @@ import androidx.room.Query
 
 @Dao
 interface CredentialDao {
-    @Query("SELECT * FROM credentials ORDER BY title ASC")
+    @Query("SELECT * FROM credentials ORDER BY createdAt DESC")
     fun getCredentialsPaged(): PagingSource<Int, CredentialEntity>
 
     @Query(
         """
         SELECT * FROM credentials
-        WHERE title LIKE :query OR username LIKE :query
-        ORDER BY title ASC
+        WHERE description LIKE :query
+        ORDER BY createdAt DESC
         """
     )
     fun searchCredentialsPaged(query: String): PagingSource<Int, CredentialEntity>

@@ -8,7 +8,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import net.sqlcipher.database.SupportFactory
 
-@Database(entities = [CredentialEntity::class], version = 2, exportSchema = true)
+@Database(entities = [CredentialEntity::class], version = 3, exportSchema = true)
 abstract class VaultDatabase : RoomDatabase() {
     abstract fun credentialDao(): CredentialDao
 
@@ -32,6 +32,12 @@ abstract class VaultDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_credentials_description ON credentials(description)")
+            }
+        }
+
         fun build(context: Context, passphrase: ByteArray): VaultDatabase {
             return Room.databaseBuilder(
                 context,
@@ -39,7 +45,7 @@ abstract class VaultDatabase : RoomDatabase() {
                 "vault_encrypted.db"
             )
                 .openHelperFactory(SupportFactory(passphrase))
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
         }
     }

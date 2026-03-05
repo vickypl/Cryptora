@@ -8,7 +8,7 @@ import com.yourapp.vault.domain.model.CredentialCategory
 
 @Entity(
     tableName = "credentials",
-    indices = [Index(value = ["title"]), Index(value = ["username"])]
+    indices = [Index(value = ["title"]), Index(value = ["username"]), Index(value = ["description"])]
 )
 data class CredentialEntity(
     @PrimaryKey val id: String,

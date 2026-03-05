@@ -16,20 +16,19 @@ import javax.crypto.spec.SecretKeySpec
 
 class VaultBackupManager(private val context: Context) {
     fun vaultExists(directoryUri: Uri): Boolean {
-        val dir = DocumentFile.fromTreeUri(context, directoryUri) ?: return false
-        return dir.findFile(VAULT_FILE_NAME)?.exists() == true
+        val tree = DocumentFile.fromTreeUri(context, directoryUri)
+        if (tree != null) {
+            return tree.findFile(VAULT_FILE_NAME)?.exists() == true
+        }
+        return runCatching { context.contentResolver.openInputStream(directoryUri)?.close(); true }
+            .getOrDefault(false)
     }
 
     fun writeVault(directoryUri: Uri, credentials: List<Credential>, masterPassword: CharArray): Result<Unit> {
         return runCatching {
-            val dir = DocumentFile.fromTreeUri(context, directoryUri) ?: error("Unable to access selected directory")
             val payload = encryptPayload(credentialsToJson(credentials), masterPassword)
-
-            val file = dir.findFile(VAULT_FILE_NAME)
-                ?: dir.createFile("application/octet-stream", VAULT_FILE_NAME)
-                ?: error("Unable to create vault file")
-
-            context.contentResolver.openOutputStream(file.uri, "wt")?.use { stream ->
+            val targetUri = resolveBackupFileUri(directoryUri)
+            context.contentResolver.openOutputStream(targetUri, "wt")?.use { stream ->
                 stream.write(payload.toByteArray(StandardCharsets.UTF_8))
                 stream.flush()
             } ?: error("Unable to write vault file")
@@ -38,14 +37,32 @@ class VaultBackupManager(private val context: Context) {
 
     fun restoreVault(directoryUri: Uri, masterPassword: CharArray): Result<List<Credential>> {
         return runCatching {
-            val dir = DocumentFile.fromTreeUri(context, directoryUri) ?: error("Unable to access selected directory")
-            val file = dir.findFile(VAULT_FILE_NAME) ?: error("Vault file not found")
-            val content = context.contentResolver.openInputStream(file.uri)?.use { stream ->
+            val fileUri = resolveExistingBackupUri(directoryUri)
+            val content = context.contentResolver.openInputStream(fileUri)?.use { stream ->
                 stream.readBytes().toString(StandardCharsets.UTF_8)
             } ?: error("Unable to read vault file")
             val decryptedJson = decryptPayload(content, masterPassword)
             jsonToCredentials(decryptedJson)
         }
+    }
+
+    private fun resolveBackupFileUri(directoryOrFileUri: Uri): Uri {
+        val tree = DocumentFile.fromTreeUri(context, directoryOrFileUri)
+        if (tree != null) {
+            val file = tree.findFile(VAULT_FILE_NAME)
+                ?: tree.createFile("application/octet-stream", VAULT_FILE_NAME)
+                ?: error("Unable to create vault file")
+            return file.uri
+        }
+        return directoryOrFileUri
+    }
+
+    private fun resolveExistingBackupUri(directoryOrFileUri: Uri): Uri {
+        val tree = DocumentFile.fromTreeUri(context, directoryOrFileUri)
+        if (tree != null) {
+            return tree.findFile(VAULT_FILE_NAME)?.uri ?: error("Vault file not found")
+        }
+        return directoryOrFileUri
     }
 
     private fun encryptPayload(plainJson: String, masterPassword: CharArray): String {
@@ -113,6 +130,20 @@ class VaultBackupManager(private val context: Context) {
                     .put("url", credential.url)
                     .put("notes", credential.notes)
                     .put("category", credential.category)
+                    .put("description", credential.description)
+                    .put("emailLogin", credential.emailLogin)
+                    .put("emailPassword", credential.emailPassword)
+                    .put("bankCustomerId", credential.bankCustomerId)
+                    .put("bankAccountNo", credential.bankAccountNo)
+                    .put("bankIfscCode", credential.bankIfscCode)
+                    .put("bankNetLogin", credential.bankNetLogin)
+                    .put("bankNetPassword", credential.bankNetPassword)
+                    .put("bankAppLogin", credential.bankAppLogin)
+                    .put("bankAppPassword", credential.bankAppPassword)
+                    .put("cardNumber", credential.cardNumber)
+                    .put("cardCvv", credential.cardCvv)
+                    .put("cardExpiry", credential.cardExpiry)
+                    .put("identityId", credential.identityId)
                     .put("createdAt", credential.createdAt)
                     .put("updatedAt", credential.updatedAt)
             )
@@ -129,18 +160,37 @@ class VaultBackupManager(private val context: Context) {
                 add(
                     Credential(
                         id = item.getString("id"),
-                        title = item.getString("title"),
-                        username = item.getString("username"),
-                        password = item.getString("password"),
-                        url = item.optString("url", null),
-                        notes = item.optString("notes", null),
-                        category = item.getString("category"),
+                        title = item.optString("title", ""),
+                        username = item.optString("username", ""),
+                        password = item.optString("password", ""),
+                        url = item.optNullableString("url"),
+                        notes = item.optNullableString("notes"),
+                        category = item.optString("category", "OTHER"),
+                        description = item.optString("description", ""),
+                        emailLogin = item.optNullableString("emailLogin"),
+                        emailPassword = item.optNullableString("emailPassword"),
+                        bankCustomerId = item.optNullableString("bankCustomerId"),
+                        bankAccountNo = item.optNullableString("bankAccountNo"),
+                        bankIfscCode = item.optNullableString("bankIfscCode"),
+                        bankNetLogin = item.optNullableString("bankNetLogin"),
+                        bankNetPassword = item.optNullableString("bankNetPassword"),
+                        bankAppLogin = item.optNullableString("bankAppLogin"),
+                        bankAppPassword = item.optNullableString("bankAppPassword"),
+                        cardNumber = item.optNullableString("cardNumber"),
+                        cardCvv = item.optNullableString("cardCvv"),
+                        cardExpiry = item.optNullableString("cardExpiry"),
+                        identityId = item.optNullableString("identityId"),
                         createdAt = item.optLong("createdAt", System.currentTimeMillis()),
                         updatedAt = item.optLong("updatedAt", System.currentTimeMillis())
                     )
                 )
             }
         }
+    }
+
+    private fun JSONObject.optNullableString(key: String): String? {
+        if (!has(key) || isNull(key)) return null
+        return optString(key, null)?.takeIf { it != "null" }
     }
 
     private fun ByteArray.toB64(): String = Base64.encodeToString(this, Base64.NO_WRAP)

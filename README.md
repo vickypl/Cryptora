@@ -41,45 +41,13 @@ Because it works offline, your data is not uploaded to cloud servers by this app
 
 ---
 
-## 3) Setup Guide (ZIP -> APK -> Install)
+## 3) Quick Setup
 
-Follow these steps if you downloaded the project as a ZIP and want to install the app APK.
-
-### Step A: Download and extract
-1. Download the project ZIP.
-2. Extract it (unzip) to a folder on your computer.
-3. Open terminal/command prompt in that extracted folder.
-
-### Step B: Build APK
-> Requirement: Android SDK + JDK 17 installed.
-
-Run:
-
-```bash
-./gradlew :app:packageCryptoraApk
-```
-
-After build completes, APK will be available at:
-
-```text
-app/build/outputs/apk/cryptora/release/Cryptora.apk
-```
-
-### Step C: Move APK to your phone
-Use any one method:
-- USB file transfer
-- Nearby Share
-- Cloud drive (upload/download manually)
-
-### Step D: Install on Android
-1. On your phone, open the APK file.
-2. If prompted, allow installation from this source.
-3. Continue and install.
-
-If install is blocked:
-- Remove older Cryptora app first (if signed differently).
-- Make sure file name is `Cryptora.apk` from the latest build.
-- Rebuild using the command above and copy again.
+1. Download the ZIP.
+2. Extract it.
+3. Install `Cryptora.apk` on your Android phone.
+4. Open the app and provide your master password.
+5. If you have an existing backup, restore it from your backup directory.
 
 ---
 

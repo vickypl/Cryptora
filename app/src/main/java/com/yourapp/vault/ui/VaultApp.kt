@@ -611,6 +611,9 @@ private fun VaultHome(
             },
             onImportBackup = onImportBackup,
             activeBackupUri = onActiveBackupUriRequest(),
+            onImportSuccess = { count ->
+                scope.launch { snackbar.showSnackbar("Imported $count credentials successfully") }
+            },
             onDismiss = { settingsOpen = false }
         )
     }
@@ -789,6 +792,7 @@ private fun SettingsDialog(
     onChangeMasterPassword: (next: String) -> String?,
     onImportBackup: suspend (Uri, String) -> Result<Int>,
     activeBackupUri: Uri?,
+    onImportSuccess: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
     var newPassword by remember { mutableStateOf("") }
@@ -952,27 +956,31 @@ private fun SettingsDialog(
                     importError = null
                 }
             },
-            onConfirm = onConfirm@{ password ->
+            onConfirm = { password ->
                 val uri = importUri
+                val enteredPassword = password.trim()
                 if (uri == null) {
                     importError = "No backup file selected"
-                    return@onConfirm
-                }
-                importLoading = true
-                importError = null
-                scope.launch {
-                    val result = withContext(Dispatchers.IO) { onImportBackup(uri, password) }
-                    importLoading = false
-                    result.fold(
-                        onSuccess = { count ->
-                            showImportDialog = false
-                            importUri = null
-                            passwordError = "Import success: imported $count credentials"
-                        },
-                        onFailure = { error ->
-                            importError = error.message ?: "Wrong password or corrupted file"
-                        }
-                    )
+                } else if (enteredPassword.isBlank()) {
+                    importError = "Password is required"
+                } else {
+                    importLoading = true
+                    importError = null
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) { onImportBackup(uri, enteredPassword) }
+                        importLoading = false
+                        result.fold(
+                            onSuccess = { count ->
+                                showImportDialog = false
+                                importUri = null
+                                importError = null
+                                onImportSuccess(count)
+                            },
+                            onFailure = { error ->
+                                importError = error.message ?: "Wrong password or corrupted file"
+                            }
+                        )
+                    }
                 }
             }
         )

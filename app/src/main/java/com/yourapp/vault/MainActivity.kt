@@ -260,23 +260,29 @@ class MainActivity : FragmentActivity() {
                         lockoutMs = appContainer.authManager.lockoutRemainingMs(),
                         sessionRemainingMs = sessionRemainingMs,
                         onImportBackup = { backupUri, importPassword, currentMasterPasswordOverride ->
-                            val currentPassword = sessionVm.getMasterPassword()
+                            val sessionPassword = sessionVm.getMasterPassword()
                                 ?.concatToString()
                                 ?.takeIf { it.isNotBlank() }
-                                ?: currentMasterPasswordOverride?.takeIf { it.isNotBlank() }
+                            val overridePassword = currentMasterPasswordOverride?.takeIf { it.isNotBlank() }
+                            val currentPassword = sessionPassword ?: overridePassword
                             if (currentPassword == null) {
                                 Result.failure(
                                     IllegalStateException(
-                                        "Current app master password unavailable. Unlock with master password (not biometric) or enter it in the import dialog."
+                                        "Current app master password unavailable. If you unlocked via biometric, lock and unlock with master password or enter it in the import dialog."
                                     )
                                 )
                             } else {
-                                vaultViewModel?.importBackup(
+                                val result = vaultViewModel?.importBackup(
                                     backupUri = backupUri,
                                     importPassword = importPassword,
                                     currentMasterPassword = currentPassword,
                                     onBackupTargetActivated = { appContainer.persistVaultDirectory(it) }
                                 ) ?: Result.failure(IllegalStateException("Vault unavailable"))
+
+                                if (result.isSuccess && sessionPassword == null && overridePassword != null) {
+                                    sessionVm.setMasterPassword(overridePassword)
+                                }
+                                result
                             }
                         },
                         onActiveBackupUriRequest = appContainer::selectedVaultDirectory,

@@ -139,7 +139,9 @@ fun VaultApp(
                 onBiometricUnlock = onBiometricUnlock,
                 lockoutMs = lockoutMs,
                 onUserActivity = onUserActivity,
-                biometricEnabled = biometricEnabled
+                biometricEnabled = biometricEnabled,
+                onImportBackup = onImportBackup,
+                onActiveBackupUriRequest = onActiveBackupUriRequest
             )
             else -> VaultHome(
                 rooted = rooted,
@@ -328,11 +330,38 @@ private fun UnlockScreen(
     onBiometricUnlock: (onResult: (String?) -> Unit) -> Unit,
     lockoutMs: Long,
     onUserActivity: () -> Unit,
-    biometricEnabled: Boolean
+    biometricEnabled: Boolean,
+    onImportBackup: suspend (Uri, String, String?) -> Result<Int>,
+    onActiveBackupUriRequest: () -> Uri?
 ) {
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var attemptedBiometric by remember { mutableStateOf(false) }
+    var importUri by remember { mutableStateOf<Uri?>(null) }
+    var showImportDialog by remember { mutableStateOf(false) }
+    var importError by remember { mutableStateOf<String?>(null) }
+    var importLoading by remember { mutableStateOf(false) }
+    var requireCurrentMasterPassword by remember { mutableStateOf(false) }
+    var currentMasterPasswordOverride by remember { mutableStateOf("") }
+    var importSuccessMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val activeBackupUri = onActiveBackupUriRequest()
+    val filePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            }
+            importUri = uri
+            importError = null
+            requireCurrentMasterPassword = false
+            currentMasterPasswordOverride = ""
+            showImportDialog = true
+        }
+    }
 
     LaunchedEffect(biometricEnabled, lockoutMs) {
         if (biometricEnabled && lockoutMs == 0L && !attemptedBiometric) {
@@ -451,7 +480,96 @@ private fun UnlockScreen(
                     }
                 }
             }
+
+            TextButton(
+                onClick = { filePickerLauncher.launch(arrayOf("application/octet-stream")) },
+                enabled = !importLoading,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.size(6.dp))
+                Text(
+                    text = "Restore from backup file",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                )
+            }
+
+            activeBackupUri?.let {
+                Text(
+                    text = "Active backup: ${it.lastPathSegment ?: "Unknown"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            importSuccessMessage?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
+    }
+
+    if (showImportDialog) {
+        ImportPasswordDialog(
+            isLoading = importLoading,
+            errorMessage = importError,
+            requireCurrentMasterPassword = requireCurrentMasterPassword,
+            currentMasterPassword = currentMasterPasswordOverride,
+            onCurrentMasterPasswordChange = { currentMasterPasswordOverride = it },
+            onDismiss = {
+                if (!importLoading) {
+                    showImportDialog = false
+                    importUri = null
+                    importError = null
+                    requireCurrentMasterPassword = false
+                    currentMasterPasswordOverride = ""
+                }
+            },
+            onConfirm = { backupPassword ->
+                val uri = importUri
+                val enteredPassword = backupPassword.trim()
+                if (uri == null) {
+                    importError = "No file selected"
+                } else if (enteredPassword.isBlank()) {
+                    importError = "Password is required"
+                } else if (requireCurrentMasterPassword && currentMasterPasswordOverride.trim().isBlank()) {
+                    importError = "Enter your current app master password"
+                } else {
+                    importLoading = true
+                    importError = null
+                    scope.launch {
+                        val override = currentMasterPasswordOverride.trim().takeIf { it.isNotBlank() }
+                        val result = withContext(Dispatchers.IO) { onImportBackup(uri, enteredPassword, override) }
+                        importLoading = false
+                        result.fold(
+                            onSuccess = { count ->
+                                showImportDialog = false
+                                importUri = null
+                                requireCurrentMasterPassword = false
+                                currentMasterPasswordOverride = ""
+                                importError = null
+                                importSuccessMessage = "Imported $count credentials successfully"
+                            },
+                            onFailure = { err ->
+                                val msg = err.message ?: "Wrong password or corrupted file"
+                                importError = msg
+                                if (msg.contains("unavailable", ignoreCase = true)) {
+                                    requireCurrentMasterPassword = true
+                                    importError = "You unlocked via biometric previously. Enter your master password to authorize backup re-encryption."
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        )
     }
 }
 

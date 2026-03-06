@@ -68,9 +68,13 @@ class VaultViewModel(
     fun registerBackupTarget(directoryUri: android.net.Uri, masterPassword: String) {
         val activeUri = backupDirectoryProvider?.invoke() ?: return
         if (activeUri != directoryUri) return
-        activeSyncPassword?.fill('\u0000')
-        activeSyncPassword = masterPassword.toCharArray()
+        updateActiveMasterPassword(masterPassword.toCharArray())
         syncBackupWithPassword(masterPassword.toCharArray())
+    }
+
+    fun updateActiveMasterPassword(newPassword: CharArray) {
+        activeSyncPassword?.fill('\u0000')
+        activeSyncPassword = newPassword.copyOf()
     }
 
     suspend fun importBackup(
@@ -99,8 +103,7 @@ class VaultViewModel(
             }
 
             onBackupTargetActivated(backupUri)
-            activeSyncPassword?.fill('\u0000')
-            activeSyncPassword = currentMasterPassword.toCharArray()
+            updateActiveMasterPassword(currentMasterPassword.toCharArray())
 
             restored.size
         }
@@ -133,8 +136,7 @@ class VaultViewModel(
                     manager.writeVault(directory, snapshot, passwordChars)
                         .getOrElse { throw it }
                 }
-                activeSyncPassword?.fill('\u0000')
-                activeSyncPassword = newPassword.toCharArray()
+                updateActiveMasterPassword(newPassword.toCharArray())
             } finally {
                 passwordChars.fill('\u0000')
             }

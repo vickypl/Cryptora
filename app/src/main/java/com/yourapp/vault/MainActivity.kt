@@ -259,6 +259,33 @@ class MainActivity : FragmentActivity() {
                         onUserActivity = { sessionVm.resetInactivityTimer() },
                         lockoutMs = appContainer.authManager.lockoutRemainingMs(),
                         sessionRemainingMs = sessionRemainingMs,
+                        onImportBackup = { backupUri, importPassword, currentMasterPasswordOverride ->
+                            val sessionPassword = sessionVm.getMasterPassword()
+                                ?.concatToString()
+                                ?.takeIf { it.isNotBlank() }
+                            val overridePassword = currentMasterPasswordOverride?.takeIf { it.isNotBlank() }
+                            val currentPassword = sessionPassword ?: overridePassword
+                            if (currentPassword == null) {
+                                Result.failure(
+                                    IllegalStateException(
+                                        "Current app master password unavailable. If you unlocked via biometric, lock and unlock with master password or enter it in the import dialog."
+                                    )
+                                )
+                            } else {
+                                val result = vaultViewModel?.importBackup(
+                                    backupUri = backupUri,
+                                    importPassword = importPassword,
+                                    currentMasterPassword = currentPassword,
+                                    onBackupTargetActivated = { appContainer.persistVaultDirectory(it) }
+                                ) ?: Result.failure(IllegalStateException("Vault unavailable"))
+
+                                if (result.isSuccess && sessionPassword == null && overridePassword != null) {
+                                    sessionVm.setMasterPassword(overridePassword)
+                                }
+                                result
+                            }
+                        },
+                        onActiveBackupUriRequest = appContainer::selectedVaultDirectory,
                         vaultViewModel = vaultViewModel
                     )
                 }

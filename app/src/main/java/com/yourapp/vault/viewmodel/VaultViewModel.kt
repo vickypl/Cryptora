@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.net.Uri
 
 class VaultViewModel(
     private val repository: VaultRepository,
@@ -57,6 +58,8 @@ class VaultViewModel(
     val credentialCount: StateFlow<Int> = repository.observeCredentialCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+    private var activeSyncPassword: CharArray? = null
+
     fun setQuery(value: String) {
         _query.value = value
     }
@@ -65,7 +68,45 @@ class VaultViewModel(
     fun registerBackupTarget(directoryUri: android.net.Uri, masterPassword: String) {
         val activeUri = backupDirectoryProvider?.invoke() ?: return
         if (activeUri != directoryUri) return
+        updateActiveMasterPassword(masterPassword.toCharArray())
         syncBackupWithPassword(masterPassword.toCharArray())
+    }
+
+    fun updateActiveMasterPassword(newPassword: CharArray) {
+        activeSyncPassword?.fill('\u0000')
+        activeSyncPassword = newPassword.copyOf()
+    }
+
+    suspend fun importBackup(
+        backupUri: Uri,
+        importPassword: String,
+        currentMasterPassword: String,
+        onBackupTargetActivated: (Uri) -> Unit
+    ): Result<Int> {
+        val manager = backupManager ?: return Result.failure(IllegalStateException("Backup manager unavailable"))
+        return runCatching {
+            val importPasswordChars = importPassword.toCharArray()
+            val restored = try {
+                manager.restoreVault(backupUri, importPasswordChars).getOrElse { throw it }
+            } finally {
+                importPasswordChars.fill('\u0000')
+            }
+
+            repository.upsertAll(restored)
+
+            val syncPassword = currentMasterPassword.toCharArray()
+            try {
+                manager.writeVault(backupUri, repository.listAllCredentials(), syncPassword)
+                    .getOrElse { throw it }
+            } finally {
+                syncPassword.fill('\u0000')
+            }
+
+            onBackupTargetActivated(backupUri)
+            updateActiveMasterPassword(currentMasterPassword.toCharArray())
+
+            restored.size
+        }
     }
 
     fun save(credential: Credential) {
@@ -95,6 +136,7 @@ class VaultViewModel(
                     manager.writeVault(directory, snapshot, passwordChars)
                         .getOrElse { throw it }
                 }
+                updateActiveMasterPassword(newPassword.toCharArray())
             } finally {
                 passwordChars.fill('\u0000')
             }
@@ -123,11 +165,17 @@ class VaultViewModel(
     }
 
     private fun syncBackup() {
-        val password = masterPasswordProvider?.invoke() ?: run {
+        val password = activeSyncPassword?.copyOf() ?: masterPasswordProvider?.invoke() ?: run {
             Log.w(TAG, "syncBackup skipped: no master password in active session")
             return
         }
         syncBackupWithPassword(password)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        activeSyncPassword?.fill('\u0000')
+        activeSyncPassword = null
     }
 
     companion object {

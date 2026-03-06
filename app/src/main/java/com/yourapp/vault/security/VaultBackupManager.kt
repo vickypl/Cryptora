@@ -47,7 +47,7 @@ class VaultBackupManager(private val context: Context) {
 
     fun decryptVaultBytes(encryptedBytes: ByteArray, password: CharArray): Result<List<Credential>> {
         return runCatching {
-            val decryptedJson = decryptPayload(encryptedBytes.toString(StandardCharsets.UTF_8), password)
+            val decryptedJson = decryptPayload(String(encryptedBytes, StandardCharsets.UTF_8), password)
             jsonToCredentials(decryptedJson)
         }
     }

@@ -276,7 +276,7 @@ class MainActivity : FragmentActivity() {
                                     backupUri = backupUri,
                                     importPassword = importPassword,
                                     currentMasterPassword = currentPassword,
-                                    onBackupTargetActivated = { appContainer.persistVaultDirectory(it) }
+                                    onBackupTargetActivated = { appContainer.persistImportedBackupUri(it) }
                                 ) ?: Result.failure(IllegalStateException("Vault unavailable"))
 
                                 if (result.isSuccess && sessionPassword == null && overridePassword != null) {

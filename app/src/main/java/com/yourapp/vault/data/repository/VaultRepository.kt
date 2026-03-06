@@ -1,5 +1,6 @@
 package com.yourapp.vault.data.repository
 
+import android.content.ContentResolver
 import androidx.paging.PagingSource
 import com.yourapp.vault.data.local.CredentialDao
 import com.yourapp.vault.data.local.CredentialEntity
@@ -8,7 +9,10 @@ import com.yourapp.vault.data.local.toEntity
 import com.yourapp.vault.domain.model.Credential
 import kotlinx.coroutines.flow.Flow
 
-class VaultRepository(private val dao: CredentialDao) {
+class VaultRepository(
+    private val dao: CredentialDao,
+    val contentResolver: ContentResolver
+) {
     fun getCredentialsPaged(): PagingSource<Int, CredentialEntity> = dao.getCredentialsPaged()
 
     fun searchCredentialsPaged(query: String): PagingSource<Int, CredentialEntity> = dao.searchCredentialsPaged(query)

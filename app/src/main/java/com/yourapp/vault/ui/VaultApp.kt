@@ -482,7 +482,7 @@ private fun UnlockScreen(
             }
 
             TextButton(
-                onClick = { filePickerLauncher.launch(arrayOf("application/octet-stream")) },
+                onClick = { filePickerLauncher.launch(arrayOf("application/octet-stream", "application/enc", "*/*")) },
                 enabled = !importLoading,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -1004,7 +1004,7 @@ private fun SettingsDialog(
 
                 Text("Backup", style = MaterialTheme.typography.titleMedium)
                 Button(
-                    onClick = { filePickerLauncher.launch(arrayOf("application/octet-stream")) },
+                    onClick = { filePickerLauncher.launch(arrayOf("application/octet-stream", "application/enc", "*/*")) },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !importLoading
                 ) {

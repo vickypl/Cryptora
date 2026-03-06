@@ -30,10 +30,12 @@ class AppContainer(private val context: Context) {
 
     fun createRepository(dbKey: ByteArray): VaultRepository {
         val db = VaultDatabase.build(context, dbKey)
-        return VaultRepository(db.credentialDao())
+        return VaultRepository(db.credentialDao(), context.contentResolver)
     }
 
     fun persistVaultDirectory(uri: Uri) = storage.setVaultDirectoryUri(uri.toString())
+
+    fun persistImportedBackupUri(uri: Uri) = storage.setVaultDirectoryUri(uri.toString())
 
     fun selectedVaultDirectory(): Uri? = storage.getVaultDirectoryUri()?.let(Uri::parse)
 

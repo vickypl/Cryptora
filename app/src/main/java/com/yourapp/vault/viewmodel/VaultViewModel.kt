@@ -83,23 +83,45 @@ class VaultViewModel(
         currentMasterPassword: String,
         onBackupTargetActivated: (Uri) -> Unit
     ): Result<Int> {
-        val manager = backupManager ?: return Result.failure(IllegalStateException("Backup manager unavailable"))
+        val manager = backupManager
+            ?: return Result.failure(IllegalStateException("Backup manager unavailable"))
+
         return runCatching {
+            val encryptedBytes = withContext(Dispatchers.IO) {
+                repository.contentResolver
+                    .openInputStream(backupUri)
+                    ?.use { it.readBytes() }
+                    ?: throw IllegalStateException(
+                        "Cannot read file. Make sure the file is accessible and not corrupted."
+                    )
+            }
+
             val importPasswordChars = importPassword.toCharArray()
             val restored = try {
-                manager.restoreVault(backupUri, importPasswordChars).getOrElse { throw it }
+                manager.decryptVaultBytes(encryptedBytes, importPasswordChars)
+                    .getOrElse { throw it }
             } finally {
                 importPasswordChars.fill('\u0000')
             }
 
             repository.upsertAll(restored)
 
-            val syncPassword = currentMasterPassword.toCharArray()
-            try {
-                manager.writeVault(backupUri, repository.listAllCredentials(), syncPassword)
+            val allCredentials = repository.listAllCredentials()
+            val syncPasswordChars = currentMasterPassword.toCharArray()
+            val reEncryptedBytes = try {
+                manager.encryptVaultBytes(allCredentials, syncPasswordChars)
                     .getOrElse { throw it }
             } finally {
-                syncPassword.fill('\u0000')
+                syncPasswordChars.fill('\u0000')
+            }
+
+            withContext(Dispatchers.IO) {
+                repository.contentResolver
+                    .openOutputStream(backupUri, "wt")
+                    ?.use { it.write(reEncryptedBytes) }
+                    ?: throw IllegalStateException(
+                        "Cannot write to file. Check storage permissions."
+                    )
             }
 
             onBackupTargetActivated(backupUri)
@@ -108,6 +130,7 @@ class VaultViewModel(
             restored.size
         }
     }
+
 
     fun save(credential: Credential) {
         viewModelScope.launch {

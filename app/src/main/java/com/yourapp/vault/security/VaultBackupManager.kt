@@ -26,10 +26,10 @@ class VaultBackupManager(private val context: Context) {
 
     fun writeVault(directoryUri: Uri, credentials: List<Credential>, masterPassword: CharArray): Result<Unit> {
         return runCatching {
-            val payload = encryptPayload(credentialsToJson(credentials), masterPassword)
+            val payload = encryptVaultBytes(credentials, masterPassword).getOrElse { throw it }
             val targetUri = resolveBackupFileUri(directoryUri)
             context.contentResolver.openOutputStream(targetUri, "wt")?.use { stream ->
-                stream.write(payload.toByteArray(StandardCharsets.UTF_8))
+                stream.write(payload)
                 stream.flush()
             } ?: error("Unable to write vault file")
         }
@@ -38,11 +38,23 @@ class VaultBackupManager(private val context: Context) {
     fun restoreVault(directoryUri: Uri, masterPassword: CharArray): Result<List<Credential>> {
         return runCatching {
             val fileUri = resolveExistingBackupUri(directoryUri)
-            val content = context.contentResolver.openInputStream(fileUri)?.use { stream ->
-                stream.readBytes().toString(StandardCharsets.UTF_8)
+            val payload = context.contentResolver.openInputStream(fileUri)?.use { stream ->
+                stream.readBytes()
             } ?: error("Unable to read vault file")
-            val decryptedJson = decryptPayload(content, masterPassword)
+            decryptVaultBytes(payload, masterPassword).getOrElse { throw it }
+        }
+    }
+
+    fun decryptVaultBytes(encryptedBytes: ByteArray, password: CharArray): Result<List<Credential>> {
+        return runCatching {
+            val decryptedJson = decryptPayload(encryptedBytes.toString(StandardCharsets.UTF_8), password)
             jsonToCredentials(decryptedJson)
+        }
+    }
+
+    fun encryptVaultBytes(credentials: List<Credential>, password: CharArray): Result<ByteArray> {
+        return runCatching {
+            encryptPayload(credentialsToJson(credentials), password).toByteArray(StandardCharsets.UTF_8)
         }
     }
 

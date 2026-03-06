@@ -2,6 +2,7 @@ package com.yourapp.vault.security
 
 import android.content.Context
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.util.Base64
 import androidx.documentfile.provider.DocumentFile
 import com.yourapp.vault.domain.model.Credential
@@ -16,7 +17,7 @@ import javax.crypto.spec.SecretKeySpec
 
 class VaultBackupManager(private val context: Context) {
     fun vaultExists(directoryUri: Uri): Boolean {
-        val tree = DocumentFile.fromTreeUri(context, directoryUri)
+        val tree = directoryUri.asTreeDocumentFileOrNull()
         if (tree != null) {
             return tree.findFile(VAULT_FILE_NAME)?.exists() == true
         }
@@ -59,7 +60,7 @@ class VaultBackupManager(private val context: Context) {
     }
 
     private fun resolveBackupFileUri(directoryOrFileUri: Uri): Uri {
-        val tree = DocumentFile.fromTreeUri(context, directoryOrFileUri)
+        val tree = directoryOrFileUri.asTreeDocumentFileOrNull()
         if (tree != null) {
             val file = tree.findFile(VAULT_FILE_NAME)
                 ?: tree.createFile("application/octet-stream", VAULT_FILE_NAME)
@@ -70,11 +71,17 @@ class VaultBackupManager(private val context: Context) {
     }
 
     private fun resolveExistingBackupUri(directoryOrFileUri: Uri): Uri {
-        val tree = DocumentFile.fromTreeUri(context, directoryOrFileUri)
+        val tree = directoryOrFileUri.asTreeDocumentFileOrNull()
         if (tree != null) {
             return tree.findFile(VAULT_FILE_NAME)?.uri ?: error("Vault file not found")
         }
         return directoryOrFileUri
+    }
+
+
+    private fun Uri.asTreeDocumentFileOrNull(): DocumentFile? {
+        if (!DocumentsContract.isTreeUri(this)) return null
+        return runCatching { DocumentFile.fromTreeUri(context, this) }.getOrNull()
     }
 
     private fun encryptPayload(plainJson: String, masterPassword: CharArray): String {
